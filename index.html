@@ -301,6 +301,13 @@ h1.logo em{font-style:normal;color:var(--yel);display:block}
 #rotate .rt{font-family:var(--disp);font-size:30px;letter-spacing:.08em;color:var(--yel);
   -webkit-text-stroke:3px var(--ink);paint-order:stroke fill}
 #rotate .rs{font-size:12px;letter-spacing:.1em;color:#9aa4b2;line-height:1.7}
+#rotate .rbtns{display:flex;gap:10px;margin-top:4px}
+#rotate .rbtns button{font-family:var(--ui);font-weight:800;font-size:13px;letter-spacing:.1em;
+  padding:9px 20px;cursor:pointer;border:3px solid var(--ink);border-radius:5px;
+  background:var(--yel);color:var(--ink);box-shadow:4px 4px 0 rgba(10,10,18,.7)}
+#rotate .rbtns button:active{transform:translate(2px,2px);box-shadow:2px 2px 0 rgba(10,10,18,.7)}
+#rotate .rbtns #rotskip{background:transparent;color:#9aa4b2;border-color:#4a4660;
+  box-shadow:4px 4px 0 rgba(10,10,18,.45)}
 
 /* 音频控件 */
 #audiobox{position:fixed;left:12px;top:72px;z-index:28;display:flex;flex-direction:column;
@@ -475,7 +482,11 @@ h1.logo em{font-style:normal;color:var(--yel);display:block}
 <div id="rotate">
   <div class="ph"></div>
   <div class="rt">请横屏游玩</div>
-  <div class="rs">这个游戏是按横屏设计的<br>把手机转过来，或者开启屏幕旋转</div>
+  <div class="rs">把手机转过来就行<br>点下面的按钮也能自动转</div>
+  <div class="rbtns">
+    <button id="rotbtn">自动横屏</button>
+    <button id="rotskip">就这样玩</button>
+  </div>
 </div>
 
 <div id="boot">
@@ -2861,6 +2872,7 @@ function resetGame(){
 }
 function startGame(){
   unlockAudio();
+  tryLockLandscape();   /* 用户点击这一下里去请求全屏横屏 */
   SFX.whoosh();
   BGM.setMode('battle');
   resetGame();
@@ -3044,21 +3056,111 @@ function loop(now){
 }
 
 /* ═══════════ 屏幕方向 ═══════════
-   只在触屏设备上提示横屏，桌面窗口收窄不弹 */
+   判断「现在是不是竖着」有三层依据，从权威到保守：
+
+   1. screen.orientation.type —— 系统直给的屏幕方向。
+      这就是正解，不需要陀螺仪：陀螺仪给的是设备物理姿态，
+      躺着玩、斜着靠都会干扰；screen.orientation 给的就是
+      「屏幕当前朝哪」，正是我们需要的那个值。
+   2. 没有这个 API 才退回宽高比，且要求 高 > 宽 × 1.34。
+      只高一点点不算竖屏，避开手机地址栏和桌面窄窗口的误判。
+   3. 必须是真正的触屏设备（pointer: coarse）。
+      桌面触屏笔记本的指针是 fine，不会误触发，
+      所以电脑上永远不会弹这个遮罩。
+
+   转屏事件的坑：orientationchange 在部分安卓浏览器上要 300-800ms
+   才把新的 width/height 写进去。之前只等 220ms，读到的是旧值，
+   所以已经转过去了遮罩还挂着。现在改成 4 段重试。 */
+
+var ORIENT = { userSkip: false, pausedByRotate: false };
+
+function isTouchDevice(){
+  if(navigator.maxTouchPoints <= 0) return false;
+  if(window.matchMedia){
+    if(window.matchMedia('(hover: none)').matches) return true;   /* 手机平板：没有悬停 */
+    if(window.matchMedia('(pointer: coarse)').matches) return true;
+    return false;                                                 /* 桌面，含触屏笔记本 */
+  }
+  return 'ontouchstart' in window;
+}
+
+function isPortraitNow(){
+  var so = window.screen && window.screen.orientation;
+  if(so && so.type) return so.type.indexOf('portrait') === 0;
+  return window.innerHeight > window.innerWidth * 1.34;
+}
+
+var orientTimers = [];
+function scheduleOrientCheck(){
+  for(var i = 0; i < orientTimers.length; i++) clearTimeout(orientTimers[i]);
+  orientTimers = [60, 180, 420, 850].map(function(ms){
+    return setTimeout(checkOrient, ms);
+  });
+}
+
 function checkOrient(){
-  var touch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
-  var portrait = window.innerHeight > window.innerWidth;
   var el = document.getElementById('rotate');
   if(!el) return;
-  if(touch && portrait){
-    el.classList.add('on');
-    if(BGM && BGM.isPlaying && BGM.isPlaying()) BGM.pause();
+  var want = isTouchDevice() && !ORIENT.userSkip && isPortraitNow();
+  if(want){
+    if(!el.classList.contains('on')){
+      el.classList.add('on');
+      /* 竖屏时不只停音乐，游戏也要真停，
+         否则玩家转个屏回来发现血掉了一半 */
+      if(S.mode === 'play'){ ORIENT.pausedByRotate = true; S.mode = 'pause'; }
+      if(BGM && BGM.isPlaying && BGM.isPlaying()) BGM.pause();
+    }
   } else {
-    el.classList.remove('on');
+    if(el.classList.contains('on')){
+      el.classList.remove('on');
+      if(ORIENT.pausedByRotate){
+        ORIENT.pausedByRotate = false;
+        if(S.mode === 'pause') S.mode = 'play';
+        if(BGM && BGM.resume) BGM.resume();
+      }
+    }
   }
 }
-addEventListener('resize', checkOrient);
-addEventListener('orientationchange', function(){ setTimeout(checkOrient, 220); });
+
+/* 主动请求全屏 + 锁定横屏。
+   这个 API 有两个硬约束：必须由用户手势触发、
+   必须在全屏状态下才生效。所以放在点「开始对战」时请求。
+   安卓 Chrome 会真正锁死，之后物理上转成竖屏也不会变。
+   iOS Safari 不支持 lock，只能靠遮罩兜底。 */
+function tryLockLandscape(){
+  if(!isTouchDevice()) return;
+  var de = document.documentElement;
+  var req = de.requestFullscreen || de.webkitRequestFullscreen || de.mozRequestFullScreen;
+  var p;
+  try{
+    p = req ? Promise.resolve(req.call(de)) : Promise.resolve();
+  }catch(e){
+    p = Promise.resolve();
+  }
+  p.then(function(){
+    if(window.screen && screen.orientation && screen.orientation.lock){
+      return screen.orientation.lock('landscape');
+    }
+  }).catch(function(){
+    /* 锁不住（iOS 或浏览器拒绝），让遮罩去兜底 */
+  }).then(function(){
+    scheduleOrientCheck();
+  });
+}
+
+function bindOrientUI(){
+  var rb = document.getElementById('rotbtn');
+  var rs = document.getElementById('rotskip');
+  if(rb) rb.onclick = function(){ tryLockLandscape(); };
+  if(rs) rs.onclick = function(){ ORIENT.userSkip = true; bindOrientUI();
+checkOrient(); };
+}
+
+addEventListener('resize', scheduleOrientCheck);
+addEventListener('orientationchange', scheduleOrientCheck);
+if(window.screen && screen.orientation && screen.orientation.addEventListener){
+  screen.orientation.addEventListener('change', scheduleOrientCheck);
+}
 
 /* ═══════════ 启动 ═══════════ */
 hero.obj = buildHero();
