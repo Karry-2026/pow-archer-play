@@ -495,7 +495,7 @@ function makeFloorTex(){
   for(var i=0;i<48;i++){
     g.rotate(TAU/48);
     g.beginPath(); g.moveTo(0,0); g.lineTo(0, S*0.62);
-    g.strokeStyle = i%2 ? 'rgba(123,47,247,.34)' : 'rgba(36,26,76,.9)';
+    g.strokeStyle = i%2 ? 'rgba(123,47,247,.16)' : 'rgba(30,21,66,.95)';
     g.lineWidth = i%2 ? 10 : 22; g.stroke();
   }
   g.restore();
@@ -578,7 +578,7 @@ buildArena();
 /* ─────────── 相机 ─────────── */
 var _camWant = new THREE.Vector3();
 function updateCamera(dt, px, pz){
-  var camH = 25.5, camZ = 17.5;
+  var camH = 24, camZ = 16.5;
   var lookX = px + (hero.mx||0)*1.9;
   var lookZ = pz + (hero.mz||0)*1.9;
   camTarget.set(px, 0, pz);
@@ -856,7 +856,7 @@ function buildHero(){
   g.add(e1); g.add(e2);
 
   // 头巾
-  var band = part(new THREE.ConeGeometry(0.42, 0.34, 8), COS.cyn, 1.1);
+  var band = part(new THREE.ConeGeometry(0.42, 0.34, 8), COS.yel, 1.1);
   band.position.y = 1.58; band.rotation.y = 0.4; g.add(band);
 
   // 弓
@@ -884,24 +884,25 @@ function buildHero(){
 }
 
 /* ═══════════ 敌人 ═══════════ */
-/* ═══════════ 难度曲线（锯齿 + 阶梯） ═══════════
-   依据公开的 sawtooth 难度模型与「线性递增 + 阶梯跳跃」配平法：
-   · 每段起点略低于玩家强度，留呼吸空间
-   · 段内线性爬升，追平玩家
-   · 尖峰（BOSS）超出玩家 10-20%
-   · 下一段回落约 12%，再重新起步
-   · 每波内再线性 +6%（血量）/ +5%（伤害），避免整波一个强度 */
+/* ═══════════ 难度曲线 ═══════════
+   设计原则：单调递增，每波增幅稳定，不做回落。
+   · 血量每波 ×1.13（等比）。后期玩家 DPS 涨得快，血量必须跟上，否则一刀秒。
+   · 伤害每波 ×1.10（等比）。前期涨得慢玩家没感觉，攒到第 10 波是 2.36 倍，
+     配合血量被动收窄（+18/级，满级 190 血），后期容错从 10 下缩到 4 下。
+   · 刷怪率每波 +0.10~0.11（等差）。压力主要来自数量，不是单体。
+   · BOSS 波（5、10）不靠小怪曲线加难度，BOSS 本身的强度单独算。
+   每波内再加 +6% 血 / +5% 伤，避免一波 30 秒内强度完全一样。 */
 var WAVE_CURVE = [
   {hp:1.00, dmg:1.00, rate:1.00},  // W1  呼吸区
-  {hp:1.12, dmg:1.02, rate:1.10},  // W2
-  {hp:1.38, dmg:1.16, rate:1.24},  // W3  台阶：尖刺兽入场
-  {hp:1.52, dmg:1.20, rate:1.34},  // W4
-  {hp:1.92, dmg:1.34, rate:1.28},  // W5  尖峰：BOSS
-  {hp:1.66, dmg:1.38, rate:1.48},  // W6  回落 13%，台阶：投掷手入场
-  {hp:1.86, dmg:1.44, rate:1.58},  // W7
-  {hp:2.32, dmg:1.58, rate:1.72},  // W8  台阶：肥球成群
-  {hp:2.68, dmg:1.72, rate:1.84},  // W9
-  {hp:3.35, dmg:1.92, rate:1.90}   // W10 尖峰：最终 BOSS
+  {hp:1.13, dmg:1.10, rate:1.10},  // W2
+  {hp:1.28, dmg:1.21, rate:1.21},  // W3  尖刺兽入场
+  {hp:1.44, dmg:1.33, rate:1.32},  // W4
+  {hp:1.63, dmg:1.46, rate:1.38},  // W5  BOSS
+  {hp:1.84, dmg:1.61, rate:1.50},  // W6  投掷手入场
+  {hp:2.08, dmg:1.77, rate:1.60},  // W7
+  {hp:2.35, dmg:1.95, rate:1.71},  // W8  肥球成群
+  {hp:2.66, dmg:2.14, rate:1.82},  // W9
+  {hp:3.00, dmg:2.36, rate:1.92}   // W10 BOSS
 ];
 function waveCurve(wave, prog){
   var c = WAVE_CURVE[clamp(wave,1,10)-1];
@@ -909,11 +910,117 @@ function waveCurve(wave, prog){
   return { hp: c.hp*(1+0.06*p), dmg: c.dmg*(1+0.05*p), rate: c.rate };
 }
 
+/* ═══════════ 几何拼装 ═══════════
+   把多个基础几何按位置/旋转/缩放拼成一个带顶点色的几何。
+   好处：造型复杂了，但一个小怪仍然只有 1 个 draw call（本体）+ 1 个（描边）。
+   顶点色让一个材质能画出身体、眼睛、牙齿等不同颜色的部件。 */
+function mergeParts(parts){
+  var pos = [], nor = [], col = [];
+  var v = new THREE.Vector3(), q = new THREE.Quaternion(),
+      e = new THREE.Euler(), s = new THREE.Vector3(), m = new THREE.Matrix4();
+  var c = new THREE.Color();
+  for(var i=0;i<parts.length;i++){
+    var p = parts[i];
+    var g = p.geo.index ? p.geo.toNonIndexed() : p.geo.clone();
+    v.set(p.x||0, p.y||0, p.z||0);
+    e.set(p.rx||0, p.ry||0, p.rz||0);
+    q.setFromEuler(e);
+    s.set(p.sx==null?1:p.sx, p.sy==null?1:p.sy, p.sz==null?1:p.sz);
+    m.compose(v, q, s);
+    g.applyMatrix4(m);
+    var pa = g.attributes.position.array;
+    var na = g.attributes.normal ? g.attributes.normal.array : null;
+    c.set(p.color);
+    for(var j=0;j<pa.length;j+=3){
+      pos.push(pa[j], pa[j+1], pa[j+2]);
+      if(na) nor.push(na[j], na[j+1], na[j+2]);
+      else nor.push(0, 1, 0);
+      col.push(c.r, c.g, c.b);
+    }
+    g.dispose();
+  }
+  var out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  out.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+  out.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  return out;
+}
+function toonVC(){
+  return new THREE.MeshToonMaterial({color:0xffffff, gradientMap:GRAD, vertexColors:true});
+}
+function G_sphere(r, w, h){ return new THREE.SphereGeometry(r, w||10, h||8); }
+function G_ico(r, d){ return new THREE.IcosahedronGeometry(r, d||0); }
+function G_octa(r){ return new THREE.OctahedronGeometry(r, 0); }
+function G_cone(r, h, seg){ return new THREE.ConeGeometry(r, h, seg||5); }
+function G_box(w, h, d){ return new THREE.BoxGeometry(w, h, d); }
+function G_cyl(rt, rb, h, seg){ return new THREE.CylinderGeometry(rt, rb, h, seg||8); }
+
+var INK = 0x0a0a12, WHITE = 0xfff6e9;
+
+/* ── 墨渍虫：软体，两只大眼，身后三根触须 ── */
+function makeBlob(){
+  var P = [];
+  P.push({geo:G_sphere(0.55, 12, 9), color:COS.pur, y:0.52, sy:0.82});
+  P.push({geo:G_sphere(0.20), color:WHITE, x:-0.19, y:0.70, z:0.40});
+  P.push({geo:G_sphere(0.20), color:WHITE, x:0.19, y:0.70, z:0.40});
+  P.push({geo:G_sphere(0.10), color:INK, x:-0.19, y:0.70, z:0.55});
+  P.push({geo:G_sphere(0.10), color:INK, x:0.19, y:0.70, z:0.55});
+  P.push({geo:G_cone(0.075, 0.46, 5), color:COS.mag, x:0, y:0.20, z:-0.42, rx:1.45});
+  P.push({geo:G_cone(0.065, 0.40, 5), color:COS.mag, x:-0.28, y:0.16, z:-0.34, rx:1.15, rz:0.4});
+  P.push({geo:G_cone(0.065, 0.40, 5), color:COS.mag, x:0.28, y:0.16, z:-0.34, rx:1.15, rz:-0.4});
+  return mergeParts(P);
+}
+
+/* ── 尖刺兽：八面体身体 + 六根黄刺 + 一道横眼 ── */
+function makeSpiker(){
+  var P = [];
+  P.push({geo:G_octa(0.46), color:COS.cyn, y:0.62});
+  P.push({geo:G_cone(0.10, 0.44, 4), color:COS.yel, x:-0.30, y:0.86, rz:0.9});
+  P.push({geo:G_cone(0.10, 0.44, 4), color:COS.yel, x:0.30, y:0.86, rz:-0.9});
+  P.push({geo:G_cone(0.10, 0.44, 4), color:COS.yel, x:-0.30, y:0.38, rz:-0.9});
+  P.push({geo:G_cone(0.10, 0.44, 4), color:COS.yel, x:0.30, y:0.38, rz:0.9});
+  P.push({geo:G_cone(0.12, 0.42, 4), color:COS.yel, y:1.02});
+  P.push({geo:G_box(0.46, 0.09, 0.1), color:INK, y:0.66, z:0.40});
+  P.push({geo:G_box(0.10, 0.10, 0.06), color:COS.mag, x:-0.13, y:0.66, z:0.45});
+  P.push({geo:G_box(0.10, 0.10, 0.06), color:COS.mag, x:0.13, y:0.66, z:0.45});
+  return mergeParts(P);
+}
+
+/* ── 肥球：大圆身 + 一张裂口 + 四颗牙 + 两条小短腿 ── */
+function makeChunk(){
+  var P = [];
+  P.push({geo:G_sphere(0.88, 14, 10), color:COS.yel, y:0.86, sy:0.92});
+  P.push({geo:G_box(0.56, 0.26, 0.16), color:INK, y:0.72, z:0.80});
+  P.push({geo:G_box(0.10, 0.15, 0.07), color:WHITE, x:-0.17, y:0.72, z:0.87});
+  P.push({geo:G_box(0.10, 0.15, 0.07), color:WHITE, x:0.00, y:0.72, z:0.87});
+  P.push({geo:G_box(0.10, 0.15, 0.07), color:WHITE, x:0.17, y:0.72, z:0.87});
+  P.push({geo:G_sphere(0.15), color:COS.red, x:-0.26, y:1.02, z:0.62});
+  P.push({geo:G_sphere(0.15), color:COS.red, x:0.26, y:1.02, z:0.62});
+  P.push({geo:G_sphere(0.18), color:COS.pur, x:-0.28, y:0.20, z:0.10});
+  P.push({geo:G_sphere(0.18), color:COS.pur, x:0.28, y:0.20, z:0.10});
+  return mergeParts(P);
+}
+
+/* ── 投掷手：柱状身体 + 圆头 + 举着一颗弹药 ── */
+function makeThrower(){
+  var P = [];
+  P.push({geo:G_cyl(0.32, 0.44, 0.82, 8), color:COS.red, y:0.42});
+  P.push({geo:G_sphere(0.30, 12, 9), color:COS.red, y:1.02});
+  P.push({geo:G_sphere(0.09), color:WHITE, x:-0.11, y:1.06, z:0.24});
+  P.push({geo:G_sphere(0.09), color:WHITE, x:0.11, y:1.06, z:0.24});
+  P.push({geo:G_sphere(0.05), color:INK, x:-0.11, y:1.06, z:0.31});
+  P.push({geo:G_sphere(0.05), color:INK, x:0.11, y:1.06, z:0.31});
+  P.push({geo:G_box(0.12, 0.42, 0.12), color:0x8a1a12, x:0.36, y:0.72, z:0.10, rz:-0.25});
+  P.push({geo:G_sphere(0.15), color:COS.yel, x:0.44, y:0.98, z:0.14});
+  P.push({geo:G_cone(0.34, 0.26, 6), color:COS.mag, y:1.28, rz:0.2});
+  return mergeParts(P);
+}
+
 var ETYPES = {
-  blob:    {geo:new THREE.IcosahedronGeometry(0.62, 0), color:COS.pur,  hp:15, spd:3.5, r:0.62, dmg:7,  xp:2, out:1.27, y:0.62},
-  spiker:  {geo:new THREE.OctahedronGeometry(0.66, 0),  color:COS.cyn,  hp:24, spd:5.4, r:0.58, dmg:11, xp:3, out:1.29, y:0.7},
-  chunk:   {geo:new THREE.IcosahedronGeometry(0.96, 0), color:COS.yel,  hp:78, spd:2.2, r:1.0,  dmg:16, xp:6, out:1.22, y:0.95},
-  thrower: {geo:new THREE.ConeGeometry(0.52, 1.24, 6),  color:COS.red,  hp:36, spd:2.9, r:0.68, dmg:9,  xp:4, out:1.25, y:0.62}
+  blob:    {geo:makeBlob(),    hp:15, spd:3.5, r:0.70, dmg:10, xp:2, out:1.06, y:0, s:1.25, name:'墨渍虫'},
+  spiker:  {geo:makeSpiker(),  hp:24, spd:5.4, r:0.65, dmg:14, xp:3, out:1.07, y:0, s:1.25, name:'尖刺兽'},
+  chunk:   {geo:makeChunk(),   hp:78, spd:2.2, r:1.12, dmg:20, xp:6, out:1.05, y:0, s:1.20, name:'肥球'},
+  thrower: {geo:makeThrower(), hp:36, spd:2.9, r:0.76, dmg:12, xp:4, out:1.06, y:0, s:1.25, name:'投掷手'}
 };
 var E = { blob:[], spiker:[], chunk:[], thrower:[] };
 var EKEYS = ['blob','spiker','chunk','thrower'];
@@ -922,7 +1029,7 @@ var eMesh = {};
 EKEYS.forEach(function(k){
   var d = ETYPES[k];
   eMesh[k] = {
-    body: instPool(d.geo, toon(d.color), 90),
+    body: instPool(d.geo, toonVC(), 90),
     out:  instPool(d.geo, OUTLINE_MAT, 90)
   };
 });
@@ -930,8 +1037,24 @@ EKEYS.forEach(function(k){
 var eliteRingGeo = new THREE.RingGeometry(0.62, 0.88, 24);
 eliteRingGeo.rotateX(-Math.PI/2);
 var eliteRing = instPool(eliteRingGeo, new THREE.MeshBasicMaterial({
-  color:0xffe600, transparent:true, opacity:0.8, side:THREE.DoubleSide, depthWrite:false
+  color:0xffe600, transparent:true, opacity:0.55, side:THREE.DoubleSide, depthWrite:false
 }), 24);
+
+/* 玩家脚下的身份光环：青底 + 洋红描边圈，和敌人的黄色精英环明确区分 */
+var heroRing = new THREE.Group();
+(function(){
+  var a = new THREE.Mesh(new THREE.RingGeometry(0.72, 0.98, 28),
+    new THREE.MeshBasicMaterial({color:0x00e5ff, transparent:true, opacity:0.5, side:THREE.DoubleSide, depthWrite:false}));
+  a.rotation.x = -Math.PI/2;
+  var b = new THREE.Mesh(new THREE.RingGeometry(1.02, 1.10, 28),
+    new THREE.MeshBasicMaterial({color:0xff2e88, transparent:true, opacity:0.75, side:THREE.DoubleSide, depthWrite:false}));
+  b.rotation.x = -Math.PI/2;
+  heroRing.add(a); heroRing.add(b);
+  heroRing.position.y = 0.07;
+  heroRing.userData.inner = a;
+  heroRing.userData.outer = b;
+  scene.add(heroRing);
+})();
 
 function spawnEnemy(type, x, z, opts){
   opts = opts || {};
@@ -970,12 +1093,12 @@ function renderEnemies(){
     for(var i=0;i<list.length;i++){
       var e = list[i];
       if(e.dead) continue;
-      var hs = 1 + e.hit*0.34;
+      var hs = (1 + e.hit*0.34) * (d.s || 1);
       var bob = Math.sin(S.t*4 + e.phase)*0.08;
       if(e.elite && eliteRingIdx < 24){
         _dm.position.set(e.x, 0.09, e.z);
         _dm.rotation.set(0, S.t*1.9 + e.phase, 0);
-        _dm.scale.setScalar(e.r * 2.05);
+        _dm.scale.setScalar(e.r * 2.7);
         _dm.updateMatrix();
         eliteRing.setMatrixAt(eliteRingIdx++, _dm.matrix);
       }
@@ -1154,7 +1277,7 @@ var PDEF = {
   atk:   {name:'攻击强化', short:'ATK', col:'#ff2e88', max:5, txt:function(l){ return '所有伤害 +'+Math.round(l*16)+'%'; }},
   aspd:  {name:'攻速狂热', short:'SPD', col:'#ffe600', max:5, txt:function(l){ return '全部武器冷却 -'+Math.round((1-1/(1+l*0.14))*100)+'%'; }},
   move:  {name:'疾风之靴', short:'MOV', col:'#00e5ff', max:5, txt:function(l){ return '移动速度 +'+Math.round(l*7)+'%'; }},
-  hp:    {name:'铁壁之心', short:'HP',  col:'#ff3b30', max:5, txt:function(l){ return '生命上限 +'+l*28; }},
+  hp:    {name:'铁壁之心', short:'HP',  col:'#ff3b30', max:5, txt:function(l){ return '生命上限 +'+l*18; }},
   magnet:{name:'磁力场',   short:'MAG', col:'#b6ff3c', max:5, txt:function(l){ return '经验拾取范围 +'+Math.round(l*30)+'%'; }},
   crit:  {name:'致命一击', short:'CRT', col:'#7b2ff7', max:5, txt:function(l){ return '暴击率 +'+Math.round(l*9)+'%，暴击伤害 x2.2'; }}
 };
@@ -1187,7 +1310,7 @@ function refreshStats(){
   hero.stat.spd  = hero.speed * (1 + (p.move||0)*0.07);
   hero.stat.pick = 4.6 * (1 + (p.magnet||0)*0.30);
   hero.stat.crit = 0.06 + (p.crit||0)*0.09;
-  var newMax = 100 + (p.hp||0)*28;
+  var newMax = 100 + (p.hp||0)*18;
   if(newMax !== hero.maxhp){
     var add = newMax - hero.maxhp;
     hero.maxhp = newMax;
@@ -1340,8 +1463,8 @@ function killEnemy(e){
   if(e.dead) return;
   e.dead = true;
   S.kills++;
-  var col = ETYPES[e.t] ? ETYPES[e.t].color : COS.mag;
-  burst(e.x, e.y, e.z, col, e.boss? 26 : 7, 8, e.boss? 1.6 : 0.9);
+  var col = ETYPES[e.t] ? 0xff2e88 : COS.mag;
+  burst(e.x, (e.y||0) + 0.62, e.z, e.elite ? COS.yel : COS.mag, e.boss? 26 : 8, 8, e.boss? 1.6 : 0.95);
   SFX.kill();
 
   if(e.boss){
@@ -1910,7 +2033,7 @@ function angLerp(a, b, t){
 function hurtHero(dmg){
   if(hero.invuln > 0 || !hero.alive) return;
   hero.hp -= dmg;
-  hero.invuln = 0.58;
+  hero.invuln = 0.70;
   SFX.hurt(); shake(0.45); hurtTint(); flash(0.1);
   speedLines(0.55, 180);
   burst(hero.x, 1.0, hero.z, COS.red, 8, 7, 1.1);
@@ -1952,8 +2075,15 @@ function updateHero(dt){
   hero.obj.position.set(hero.x, bob, hero.z);
   hero.obj.rotation.y = hero.ang;
   hero.obj.rotation.z = moving ? Math.sin(S.t*15)*0.05 : 0;
-  var flashOn = hero.invuln > 0 && (Math.floor(S.t*22)%2 === 0);
-  hero.obj.visible = !flashOn;
+  hero.obj.visible = true;
+
+  heroRing.position.set(hero.x, 0.07, hero.z);
+  heroRing.userData.inner.rotation.z = S.t * 0.9;
+  heroRing.userData.outer.rotation.z = -S.t * 1.6;
+  heroRing.userData.outer.material.opacity = hero.invuln > 0
+    ? (0.4 + 0.6 * Math.abs(Math.sin(S.t * 16)))
+    : 0.75;
+  heroRing.visible = hero.alive;
 
   // 镰刀
   var sc = hasWeapon('scythe');
@@ -2532,6 +2662,7 @@ window.POW = {
   gainXP:gainXP, openChest:openChest, buildChest:buildChest, spawnBoss:spawnBoss,
   hurtHero:hurtHero, hurtEnemy:hurtEnemy, EVO:EVO, buildChoices:buildChoices,
   openLevelUp:openLevelUp, renderBag:renderBag, estimateDPS:estimateDPS,
+  spawnEnemy:spawnEnemy, ETYPES:ETYPES,
   get boss(){ return boss; }
 };
 
