@@ -576,27 +576,12 @@ function buildArena(){
 buildArena();
 
 /* ─────────── 相机 ───────────
-   两个原则：
-   1. 前瞻偏移必须自己平滑。输入值是突变的（按下 0→1，松开 1→0），
-      直接喂给镜头会让画面甩一下。
-   2. 视线角度固定。相机只平移，不转动。转动交给前瞻偏移去表达。
-      之前 lookAt 直接吃未平滑的输入，导致按下和松开各抖一次。 */
-var _camWant = new THREE.Vector3();
-var camOffX = 0, camOffZ = 0;   // 平滑后的前瞻偏移
-var CAM_AHEAD = 1.6;            // 最大前瞻距离
-var CAM_LEAD = 0.32;            // 移到位的秒数
-
+   规则一：相机只跟随玩家位置，不掺任何输入状态。
+   规则二：硬跟随，不做插值。插值会在玩家加速/减速时产生滞后，
+          画面相对玩家滑动，体感就是抽搐。
+   硬跟随下玩家在屏幕上的位置绝对固定，只有世界在滚动。 */
 function updateCamera(dt, px, pz){
   var camH = 24, camZ = 16.5;
-
-  var tOffX = (hero.mx || 0) * CAM_AHEAD;
-  var tOffZ = (hero.mz || 0) * CAM_AHEAD;
-  var k = 1 - Math.exp(-dt / (CAM_LEAD / 3));
-  camOffX += (tOffX - camOffX) * k;
-  camOffZ += (tOffZ - camOffZ) * k;
-
-  var wantX = px + camOffX;
-  var wantZ = pz + camOffZ + camZ;
 
   // 震屏
   var sx = 0, sy = 0, sz = 0;
@@ -609,11 +594,8 @@ function updateCamera(dt, px, pz){
     if(camShake < 0.02) camShake = 0;
   }
 
-  _camWant.set(wantX + sx, camH + sy, wantZ + sz);
-  camera.position.lerp(_camWant, 1 - Math.pow(0.0000007, dt));
-
-  // 视线角度写死：始终看向相机正前方的固定点，不跟玩家位置走
-  camera.lookAt(camera.position.x, 0.6, camera.position.z - camZ - 5);
+  camera.position.set(px + sx, camH + sy, pz + camZ + sz);
+  camera.lookAt(px + sx*0.5, 0.6, pz - 4);
 }
 function shake(amt){ camShake = Math.max(camShake, amt); }
 
@@ -2530,7 +2512,6 @@ function resetGame(){
   $('slots').innerHTML = '';
 
   camShake = 0;
-  camOffX = 0; camOffZ = 0;
   toast('WAVE 1', '#00e5ff');
   flash(0.25);
   updateCamera(0.016, 0, 0);
