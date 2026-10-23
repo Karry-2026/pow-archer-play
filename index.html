@@ -1492,20 +1492,31 @@ function makeSpiker(){
 
 /* ── 肥球：大圆身 + 一张裂口 + 四颗牙 + 两条小短腿 ── */
 function makeChunk(){
+  /* 坑：原来脸全放在球体下半部（y=0.72, z=0.80），而相机是 55° 俯视，
+     球自己把脸挡住了，画面上就是一个纯黄色圆盘，玩家认不出是怪。
+     现在整张脸移到球体前上方（y=1.10~1.34），俯视能看见。 */
   var P = [];
   P.push({geo:G_sphere(0.88, 14, 10), color:COS.yel, y:0.86, sy:0.92});
-  P.push({geo:G_box(0.56, 0.26, 0.16), color:INK, y:0.72, z:0.80});
-  P.push({geo:G_box(0.10, 0.15, 0.07), color:WHITE, x:-0.17, y:0.72, z:0.87});
-  P.push({geo:G_box(0.10, 0.15, 0.07), color:WHITE, x:0.00, y:0.72, z:0.87});
-  P.push({geo:G_box(0.10, 0.15, 0.07), color:WHITE, x:0.17, y:0.72, z:0.87});
-  P.push({geo:G_sphere(0.15), color:COS.red, x:-0.26, y:1.02, z:0.62});
-  P.push({geo:G_sphere(0.15), color:COS.red, x:0.26, y:1.02, z:0.62});
-  P.push({geo:G_sphere(0.18), color:COS.pur, x:-0.28, y:0.20, z:0.10});
-  P.push({geo:G_sphere(0.18), color:COS.pur, x:0.28, y:0.20, z:0.10});
+  /* 位置按球面算：球心 y=0.86、半径 0.88、y 压扁 0.92。
+     y=1.05 处球面水平半径 0.855，y=1.30 处是 0.739。
+     零件必须压在这条线外侧，否则被球体自己挡住（原来就吃这个亏）。 */
+  // 裂口：中心 z=0.80，深 0.36 → 前表面 0.98，凸出球面 0.13
+  P.push({geo:G_box(0.62, 0.32, 0.36), color:INK, y:1.05, z:0.80});
+  // 三颗牙，再往前一点
+  P.push({geo:G_box(0.11, 0.18, 0.10), color:WHITE, x:-0.17, y:1.05, z:0.99});
+  P.push({geo:G_box(0.11, 0.18, 0.10), color:WHITE, x:0.00,  y:1.05, z:1.01});
+  P.push({geo:G_box(0.11, 0.18, 0.10), color:WHITE, x:0.17,  y:1.05, z:0.99});
+  // 两颗红眼（球面在 z≈0.675，放 0.70 略外）+ 黑瞳
+  P.push({geo:G_sphere(0.17), color:COS.red, x:-0.30, y:1.30, z:0.70});
+  P.push({geo:G_sphere(0.17), color:COS.red, x:0.30,  y:1.30, z:0.70});
+  P.push({geo:G_sphere(0.075), color:INK,    x:-0.30, y:1.31, z:0.84});
+  P.push({geo:G_sphere(0.075), color:INK,    x:0.30,  y:1.31, z:0.84});
+  // 短腿：放到球体底部两侧外面（原来 y=0.20 埋在球里，只露一点像耳朵）
+  P.push({geo:G_sphere(0.19), color:COS.pur, x:-0.42, y:0.10, z:0.04});
+  P.push({geo:G_sphere(0.19), color:COS.pur, x:0.42,  y:0.10, z:0.04});
   return mergeParts(P);
 }
 
-/* ── 投掷手：柱状身体 + 圆头 + 举着一颗弹药 ── */
 function makeThrower(){
   var P = [];
   P.push({geo:G_cyl(0.32, 0.44, 0.82, 8), color:COS.red, y:0.42});
@@ -1523,7 +1534,7 @@ function makeThrower(){
 var ETYPES = {
   blob:    {geo:makeBlob(),    hp:7,  spd:3.5, r:0.70, dmg:14, xp:2, out:1.0, y:0, s:1.25, name:'墨渍虫'},
   spiker:  {geo:makeSpiker(),  hp:11, spd:5.4, r:0.65, dmg:18, xp:3, out:1.0, y:0, s:1.25, name:'尖刺兽'},
-  chunk:   {geo:makeChunk(),   hp:36, spd:2.2, r:1.12, dmg:26, xp:6, out:1.0, y:0, s:1.20, name:'肥球'},
+  chunk:   {geo:makeChunk(),   hp:36, spd:2.2, r:1.12, dmg:26, xp:6, out:1.0, outline:0.065, y:0, s:1.20, name:'肥球'},
   thrower: {geo:makeThrower(), hp:17, spd:2.9, r:0.76, dmg:16, xp:4, out:1.0, y:0, s:1.25, name:'投掷手'}
 };
 var E = { blob:[], spiker:[], chunk:[], thrower:[] };
@@ -1534,7 +1545,7 @@ EKEYS.forEach(function(k){
   var d = ETYPES[k];
   eMesh[k] = {
     body: instPool(d.geo, toonVC(), 90),
-    out:  instPool(outlineGeo(d.geo, 0.03), OUTLINE_MAT, 90)
+    out:  instPool(outlineGeo(d.geo, d.outline || 0.03), OUTLINE_MAT, 90)
   };
 });
 
@@ -2207,24 +2218,22 @@ function openChest(c){
   flash(0.2); shake(0.2);
   clearChest(c);
 
-  // 1) 武器
-  var freeNew = WKEYS.filter(function(id){ return !hasWeapon(id); });
+  /* 1) 武器：只升级「已有」武器，绝不新增。
+     参考 Arrow.io（全部内容只从升级三选一来）与 Vampire Survivors
+     （官方 Wiki：chest 只升级 player currently has 的武器）。
+     原来这里有一段 hero.weapons.push()，会在开箱时直接塞一把新武器，
+     玩家没有选择权也不暂停——这就是「我没选过怎么多了一把」的来源。
+     新武器只能从升级三选一的 wnew 卡进入。 */
   var upgradable = hero.weapons.filter(function(w){ return w.lv < WDEF[w.id].max; });
-  var gotWeapon = false;
-
-  if(freeNew.length > 0 && (hero.weapons.length < 4 || Math.random() < 0.5)){
-    if(hero.weapons.length < 4){
-      var nid = pick(freeNew);
-      hero.weapons.push({id:nid, lv:1, cd:0, tick:0});
-      toast('获得武器 · ' + WDEF[nid].name + ' Lv.1', '#00e5ff');
-      gotWeapon = true;
-    }
-  }
-  if(!gotWeapon && upgradable.length > 0){
+  if(upgradable.length > 0){
     var w2 = pick(upgradable);
     w2.lv++;
     toast('武器强化 · ' + WDEF[w2.id].name + ' Lv.' + w2.lv, '#ffe600');
-    gotWeapon = true;
+  } else if(hero.weapons.length > 0){
+    /* 全部满级：转成极限突破，避免宝箱白开 */
+    var w3 = pick(hero.weapons);
+    w3.plus = (w3.plus || 0) + 1;
+    toast('极限突破 · ' + WDEF[w3.id].name + ' +' + w3.plus, '#7b2ff7');
   }
 
   // 2) 被动
@@ -2495,11 +2504,15 @@ function aliveCount(){
 }
 
 function waveUnlocks(){
+  /* 每种怪在数组里出现几次，就是几份刷新权重。
+     原来第 3 波又 push 了一遍 blob 和 spiker，导致它们权重是肥球的 2 倍，
+     肥球本来就稀，再被压一半，很难遇到。现在每波只列一次，权重明确。 */
   var w = S.wave, out = ['blob'];
   if(w >= 2) out.push('spiker');
-  if(w >= 3) out.push('blob','spiker');
   if(w >= 4) out.push('chunk');
   if(w >= 6) out.push('thrower');
+  /* 第 8 波起肥球成群：再给一份权重，这是唯一允许的加权 */
+  if(w >= 8) out.push('chunk');
   return out;
 }
 
@@ -3397,7 +3410,7 @@ window.POW = {
   gainXP:gainXP, openChest:openChest, buildChest:buildChest, spawnBoss:spawnBoss,
   hurtHero:hurtHero, hurtEnemy:hurtEnemy, EVO:EVO, buildChoices:buildChoices,
   openLevelUp:openLevelUp, renderBag:renderBag, estimateDPS:estimateDPS,
-  spawnEnemy:spawnEnemy, ETYPES:ETYPES, camera:camera, renderer:renderer,
+  spawnEnemy:spawnEnemy, ETYPES:ETYPES, camera:camera, renderer:renderer, eMesh:eMesh,
   getAudio: function(){ return {ac: AC, bgm: BGM, master: masterGain}; },
   get boss(){ return boss; }
 };
