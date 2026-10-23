@@ -1379,22 +1379,24 @@ function buildHero(){
    · 刷怪率每波 +0.10~0.11（等差）。压力主要来自数量，不是单体。
    · BOSS 波（5、10）不靠小怪曲线加难度，BOSS 本身的强度单独算。
    每波内再加 +6% 血 / +5% 伤，避免一波 30 秒内强度完全一样。 */
-var WAVE_CURVE = [
-  {hp:1.00, dmg:1.00, rate:1.00},  // W1  呼吸区
-  {hp:1.13, dmg:1.10, rate:1.10},  // W2
-  {hp:1.28, dmg:1.21, rate:1.21},  // W3  尖刺兽入场
-  {hp:1.44, dmg:1.33, rate:1.32},  // W4
-  {hp:1.63, dmg:1.46, rate:1.38},  // W5  BOSS
-  {hp:1.84, dmg:1.61, rate:1.50},  // W6  投掷手入场
-  {hp:2.08, dmg:1.77, rate:1.60},  // W7
-  {hp:2.35, dmg:1.95, rate:1.71},  // W8  肥球成群
-  {hp:2.66, dmg:2.14, rate:1.82},  // W9
-  {hp:3.00, dmg:2.36, rate:1.92}   // W10 BOSS
-];
+/* ═══════════ 难度曲线（指数） ═══════════
+   依据 TTK 对齐法：先定「打死一只怪要几秒」，再反推血量。
+   玩家 DPS 是乘法叠加（武器数 × 等级 × 攻击 × 攻速 × 暴击），
+   第 1 波到第 10 波涨约 200 倍，所以敌人血量必须指数追赶。
+   原来用线性 ×3，第 4 波就被玩家彻底甩开，之后全是纸。
+   R=1.75 是按「小怪 TTK 稳定在 0.2-0.6 秒」反推的，改这个值要重跑数值表。 */
+var WAVE_HP_R = 1.75;        // 每波血量成长率
+var WAVE_DMG_STEP = 0.10;    // 每波伤害 +10%（等差，伤害涨太快会直接要命）
+var WAVE_RATE_STEP = 0.09;   // 每波刷怪率 +9%
+
 function waveCurve(wave, prog){
-  var c = WAVE_CURVE[clamp(wave,1,10)-1];
-  var p = clamp(prog||0, 0, 1);
-  return { hp: c.hp*(1+0.06*p), dmg: c.dmg*(1+0.05*p), rate: c.rate };
+  var w = clamp(wave, 1, 10);
+  var p = clamp(prog || 0, 0, 1);
+  return {
+    hp:   Math.pow(WAVE_HP_R, w - 1) * (1 + 0.06*p),
+    dmg:  (1 + WAVE_DMG_STEP*(w - 1)) * (1 + 0.05*p),
+    rate: 1 + WAVE_RATE_STEP*(w - 1)
+  };
 }
 
 /* ═══════════ 几何拼装 ═══════════
@@ -1519,10 +1521,10 @@ function makeThrower(){
 }
 
 var ETYPES = {
-  blob:    {geo:makeBlob(),    hp:15, spd:3.5, r:0.70, dmg:10, xp:2, out:1.0, y:0, s:1.25, name:'墨渍虫'},
-  spiker:  {geo:makeSpiker(),  hp:24, spd:5.4, r:0.65, dmg:14, xp:3, out:1.0, y:0, s:1.25, name:'尖刺兽'},
-  chunk:   {geo:makeChunk(),   hp:78, spd:2.2, r:1.12, dmg:20, xp:6, out:1.0, y:0, s:1.20, name:'肥球'},
-  thrower: {geo:makeThrower(), hp:36, spd:2.9, r:0.76, dmg:12, xp:4, out:1.0, y:0, s:1.25, name:'投掷手'}
+  blob:    {geo:makeBlob(),    hp:7,  spd:3.5, r:0.70, dmg:14, xp:2, out:1.0, y:0, s:1.25, name:'墨渍虫'},
+  spiker:  {geo:makeSpiker(),  hp:11, spd:5.4, r:0.65, dmg:18, xp:3, out:1.0, y:0, s:1.25, name:'尖刺兽'},
+  chunk:   {geo:makeChunk(),   hp:36, spd:2.2, r:1.12, dmg:26, xp:6, out:1.0, y:0, s:1.20, name:'肥球'},
+  thrower: {geo:makeThrower(), hp:17, spd:2.9, r:0.76, dmg:16, xp:4, out:1.0, y:0, s:1.25, name:'投掷手'}
 };
 var E = { blob:[], spiker:[], chunk:[], thrower:[] };
 var EKEYS = ['blob','spiker','chunk','thrower'];
@@ -1570,8 +1572,10 @@ function spawnEnemy(type, x, z, opts){
   if(list.length >= 90) return null;
   var c = waveCurve(S.wave, S.waveLen ? S.waveT/S.waveLen : 0);
   var elite = !!opts.elite;
-  var hpMul = c.hp * (opts.hpMul || 1) * (elite ? 5.5 : 1);
-  var dmgMul = c.dmg * (elite ? 1.55 : 1);
+  /* 精英按 8 倍血。原来 5.5 倍在后期失效——玩家 DPS 翻倍后
+     精英只多撑半秒，就不再是「值得绕开」的目标了。 */
+  var hpMul = c.hp * (opts.hpMul || 1) * (elite ? 8.0 : 1);
+  var dmgMul = c.dmg * (elite ? 1.7 : 1);
   var e = {
     t:type, x:x, z:z, y:d.y,
     hp:d.hp*hpMul, maxhp:d.hp*hpMul,
@@ -1744,36 +1748,42 @@ var WDEF = {
   bow:{
     name:'爆裂弓', short:'弓', col:'#00e5ff', max:5,
     cd:[0.60,0.53,0.47,0.43,0.38], dmg:[9,10,11,13,15],
+    cnt:[1,2,3,3,5], coef:0.8, cntEvo:12, coefEvo:0.9,
     lv:['单发快箭','双发连射','三向散射','三向 + 穿透','五向 + 穿透'],
     desc:'起手武器。箭数随等级增加，四级起箭头可穿透敌人。'
   },
   laser:{
     name:'穿透激光', short:'激光', col:'#ffe600', max:5,
     cd:[0.90,0.82,0.74,0.66,0.58], dmg:[14,17,20,24,28],
-    lv:['单束贯通','增强贯通','双束交叉','三束交叉','三束 + 灼烧'],
+    cnt:[1,1,2,2,3], coef:1.0, cntEvo:4, coefEvo:1.0,
+    lv:['单束贯通','增强贯通','双束交叉','双束 + 强化','三束 + 灼烧'],
     desc:'指哪打哪的直线激光，无视一切阻挡。等级越高束数越多。'
   },
   scythe:{
     name:'环绕镰', short:'镰刀', col:'#b6ff3c', max:5,
-    cd:[0.50,0.46,0.42,0.38,0.34], dmg:[14,17,21,25,30],
+    cd:[0.56,0.52,0.48,0.44,0.40], dmg:[14,17,20,23,26],
+    cnt:[1,1,1,1,1], coef:2.6, cntEvo:1, coefEvo:4.2,
     lv:['单刃环绕','双刃环绕','双刃提速','三刃环绕','四刃风暴'],
     desc:'刀刃绕身旋转，不占用射击节奏。贴脸即绞杀，最稳的近身流派。'
   },
   bomb:{
     name:'抛掷炸弹', short:'炸弹', col:'#ff3b30', max:5,
     cd:[1.55,1.40,1.28,1.16,1.02], dmg:[16,19,23,27,32],
+    cnt:[1,2,2,3,4], coef:1.2, cntEvo:6, coefEvo:1.6,
     lv:['单颗抛掷','双颗抛掷','双颗 + 爆域','三颗 + 爆域','四颗 + 连锁'],
     desc:'抛出去落地炸开，范围伤害。怪越密收益越高，清屏主力。'
   },
   shuriken:{
     name:'回旋镖', short:'飞镖', col:'#ff2e88', max:5,
-    cd:[0.85,0.78,0.70,0.62,0.54], dmg:[11,13,15,18,21],
+    cd:[0.85,0.78,0.68,0.56,0.46], dmg:[11,13,16,20,24],
+    cnt:[1,1,2,3,4], coef:0.65, cntEvo:4, coefEvo:1.2,
     lv:['单枚回旋','双枚回旋','双枚 + 加速','三枚回旋','四枚 + 追踪'],
     desc:'飞出去再飞回来，同一发能打两次。五级带自动追踪。'
   },
   spike:{
     name:'地刺', short:'地刺', color:'#7b2ff7', col:'#7b2ff7', max:5,
-    cd:[1.30,1.18,1.06,0.94,0.82], dmg:[7,9,11,14,17],
+    cd:[1.30,1.18,1.06,0.94,0.82], dmg:[9,12,15,19,24],
+    cnt:[1,1,1,1,1], coef:4.6, cntEvo:1, coefEvo:7.0,
     lv:['一片地刺','两片地刺','两片 + 减速','三片地刺','四片雷区'],
     desc:'沿走位方向留下尖刺，敌人踩上去持续掉血。边跑边下套。'
   }
@@ -1781,12 +1791,12 @@ var WDEF = {
 var WKEYS = ['bow','laser','scythe','bomb','shuriken','spike'];
 
 var PDEF = {
-  atk:   {name:'攻击强化', short:'攻击', col:'#ff2e88', max:5, txt:function(l){ return '所有伤害 +'+Math.round(l*16)+'%'; }},
-  aspd:  {name:'攻速狂热', short:'攻速', col:'#ffe600', max:5, txt:function(l){ return '全部武器冷却 -'+Math.round((1-1/(1+l*0.14))*100)+'%'; }},
-  move:  {name:'疾风之靴', short:'移速', col:'#00e5ff', max:5, txt:function(l){ return '移动速度 +'+Math.round(l*7)+'%'; }},
+  atk:   {name:'攻击强化', short:'攻击', col:'#ff2e88', max:5, txt:function(l){ return '所有伤害 +'+Math.round(l*14)+'%'; }},
+  aspd:  {name:'攻速狂热', short:'攻速', col:'#ffe600', max:5, txt:function(l){ return '全部武器冷却 -'+Math.round((1-1/(1+l*0.12))*100)+'%'; }},
+  move:  {name:'疾风之靴', short:'移速', col:'#00e5ff', max:5, txt:function(l){ return '移动速度 +'+Math.round(l*6)+'%'; }},
   hp:    {name:'铁壁之心', short:'生命',  col:'#ff3b30', max:5, txt:function(l){ return '生命上限 +'+l*18; }},
   magnet:{name:'磁力场',   short:'拾取', col:'#b6ff3c', max:5, txt:function(l){ return '经验拾取范围 +'+Math.round(l*30)+'%'; }},
-  crit:  {name:'致命一击', short:'暴击', col:'#7b2ff7', max:5, txt:function(l){ return '暴击率 +'+Math.round(l*9)+'%，暴击伤害 x2.2'; }}
+  crit:  {name:'致命一击', short:'暴击', col:'#7b2ff7', max:5, txt:function(l){ return '暴击率 +'+Math.round(l*7)+'%，暴击伤害 x2.0'; }}
 };
 var PKEYS = ['atk','aspd','move','hp','magnet','crit'];
 
@@ -1812,11 +1822,11 @@ function hasWeapon(id){
 }
 function refreshStats(){
   var p = hero.passives;
-  hero.stat.atk  = 1 + (p.atk||0)*0.16;
-  hero.stat.as   = 1 + (p.aspd||0)*0.14;
-  hero.stat.spd  = hero.speed * (1 + (p.move||0)*0.07);
+  hero.stat.atk  = 1 + (p.atk||0)*0.14;
+  hero.stat.as   = 1 + (p.aspd||0)*0.12;
+  hero.stat.spd  = hero.speed * (1 + (p.move||0)*0.06);
   hero.stat.pick = 4.6 * (1 + (p.magnet||0)*0.30);
-  hero.stat.crit = 0.06 + (p.crit||0)*0.09;
+  hero.stat.crit = 0.06 + (p.crit||0)*0.07;
   var newMax = 100 + (p.hp||0)*18;
   if(newMax !== hero.maxhp){
     var add = newMax - hero.maxhp;
@@ -1850,7 +1860,7 @@ function fireWeapon(w, st, ang, dist, tgt){
   var lv = w.lv, def = WDEF[w.id], evo = !!w.evo;
   var dmg = def.dmg[lv-1] * st.atk * (1 + 0.08*(w.plus||0));
   var isCrit = Math.random() < st.crit;
-  if(isCrit) dmg *= 2.2;
+  if(isCrit) dmg *= 2.0;
   var sx = Math.sin(ang), cz = Math.cos(ang);
   if(w.id !== 'scythe'){
     burst(hero.x + sx*0.78, 1.05, hero.z + cz*0.78, 0xfff6e9, 2, 4.6, 0.5);
@@ -2234,17 +2244,18 @@ function openChest(c){
 
 /* ═══════════ 背包 ═══════════ */
 function estimateDPS(){
+  /* 弹数和清怪系数统一从 WDEF 取，不再按武器逐个手写。
+     原来弓 Lv5 按 3 发算（实际射 5 发）、回旋镖按固定 2 倍算（实际 4 枚），
+     背包里显示的数字比真实值低一截，等于在误导玩家。
+     清怪系数 = 命中率与范围收益的等效折算，定义见数值策划表「武器表」。 */
   var total = 0, st = hero.stat;
   hero.weapons.forEach(function(w){
     var d = WDEF[w.id];
     var dmg = d.dmg[w.lv-1] * st.atk * (1 + 0.08*(w.plus||0));
     var cd = d.cd[w.lv-1] / st.as;
-    if(w.id === 'scythe') total += dmg / cd * 2.6;
-    else if(w.id === 'spike') total += dmg * 0.55 / 0.34 * 2.5;
-    else if(w.id === 'bow') total += dmg * (w.evo ? 12 : (w.lv >= 3 ? 3 : 1)) / cd * 0.8;
-    else if(w.id === 'laser') total += dmg * (w.evo ? 4 : (w.lv >= 5 ? 3 : (w.lv >= 3 ? 2 : 1))) / cd;
-    else if(w.id === 'bomb') total += dmg * (w.evo ? 2.2 : 1.4) / cd;
-    else total += dmg * 2 / cd;
+    var cnt = w.evo ? d.cntEvo : d.cnt[w.lv-1];
+    var coef = w.evo ? d.coefEvo : d.coef;
+    total += dmg * cnt / cd * coef;
   });
   return Math.round(total);
 }
@@ -2529,9 +2540,17 @@ function nextWave(){
   if(S.wave === 5 || S.wave === 10){ spawnBoss(); }
 }
 
+/* 各波次「标准配装」的预期 DPS，与 docs/POW_ARCHER_数值策划表.xlsx 的
+   「玩家成长 · 建议DPS」列一一对应。BOSS 血量由它反推，
+   这样 BOSS 战时长稳定在 12-18 秒，不会因为写死一个常数而崩。
+   改武器或被动参数后，必须重跑 build_numbers.py 同步这张表。 */
+var EXPECTED_DPS = [13, 32, 87, 127, 451, 693, 760, 1227, 1629, 2387];
+
 function spawnBoss(){
   if(boss){ scene.remove(boss.obj); boss = null; }
-  var hp = 820 + (S.wave-1)*120;
+  var ed = EXPECTED_DPS[clamp(S.wave, 1, 10) - 1];
+  var targetTtk = S.wave >= 10 ? 18 : 12;
+  var hp = Math.round(ed * targetTtk);
   var a = Math.random()*TAU, r = 16;
   var bx = clamp(Math.cos(a)*r, -ARENA_R+6, ARENA_R-6);
   var bz = clamp(Math.sin(a)*r, -ARENA_R+6, ARENA_R-6);
