@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#9ed4f5">
-<title>POW! ARCHER · 爆裂弓箭手</title>
+<title>爆裂弓箭手</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230a0a12'/%3E%3Ccircle cx='16' cy='16' r='9' fill='%23ff2e88'/%3E%3Ccircle cx='16' cy='16' r='3.5' fill='%23ffe600'/%3E%3C/svg%3E">
 <script src="https://unpkg.com/three@0.150.1/build/three.min.js"></script>
 <script>window.THREE||document.write('<script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"><\/script>');</script>
@@ -173,6 +173,7 @@ body.is-title canvas#gl{
 .pickrow{display:grid; grid-template-columns:1fr 1fr; gap:10px}
 .pick{
   display:flex; gap:12px; align-items:flex-start;
+  padding: 10px 12px 13px;
   background:#fff; color:var(--ink);
   border:4px solid var(--ink); border-radius:5px;
   padding:clamp(12px,1.2vw,18px) clamp(13px,1.3vw,19px); cursor:pointer;
@@ -324,6 +325,11 @@ body.is-title canvas#gl{
 .card .up{font-family:var(--disp);font-size:11px;letter-spacing:.1em;color:#fff;background:var(--ink);
   display:inline-block;padding:2px 8px;margin-top:8px}
 .card.evoc{border-color:#7b2ff7;box-shadow:8px 8px 0 #7b2ff7,0 0 28px rgba(255,46,136,.55)}
+/* 新武器卡：用青色边框和标签跟「强化/被动」区分开，
+   否则玩家在快节奏里分不出这张卡会往背包里加东西 */
+.card.newc{border-color:#00b8d4;box-shadow:8px 8px 0 #00b8d4,0 0 26px rgba(0,229,255,.32)}
+.card.newc .kd{color:#006d7d;font-weight:800}
+.card.newc .gain{color:#00808f}
 .card.evoc .kd{color:#ff2e88}
 .card.limitc .gain{color:#0f766e}
 .card.limitc .kd{color:#0f766e}
@@ -583,6 +589,15 @@ body.is-title canvas#gl{
 
 /* 矮屏补充：升级页与经验条 */
 @media (max-height: 520px){
+  /* 主页：矮屏下白卡别再按比例撑满，否则内容只有三行、下方空一大块 */
+  .t-body{ align-items: flex-start; flex: 0 0 auto; }
+  .t-setup{ flex: 0 0 auto; width: 100%; justify-content: flex-start; }
+  /* 标题在 390 高里会被顶边裁掉，收字号 + 缩小字距 */
+  #scr-title{ padding-top: 5px; gap: 7px; }
+  #scr-title .logo{ font-size: 24px; line-height: 1.02; }
+  .t-howto{ display: none; }
+  .pick{ padding: 7px 10px 9px; }
+
   /* 升级三选一：卡片纵向压扁，否则「重掷」按钮会被挤出屏幕 */
   #scr-level{gap:6px; padding:6px 10px}
   .lvlhead{font-size:24px; -webkit-text-stroke:4px var(--ink); text-shadow:4px 4px 0 var(--ink)}
@@ -601,6 +616,211 @@ body.is-title canvas#gl{
   .xpwrap{padding:0}
   .xpbar{height:13px; border-top-width:3px}
   .xpbar span{font-size:9px; letter-spacing:.1em}
+}
+
+/* ══════════ 主页视觉升级 ══════════
+   原来所有卡都是 5px 圆角 + skew 斜切，堆在一起像老式街机面板。
+   现在统一成 12px 圆角、双层投影、明确的卡片边界，斜切只保留在标题上。 */
+.t-setup{
+  border-radius: 14px;
+  transform: none;
+  box-shadow: 8px 8px 0 rgba(10,10,18,.62), 0 0 0 1px rgba(10,10,18,.08) inset;
+  padding: clamp(12px,1.6vh,18px) clamp(13px,1.6vw,20px);
+}
+.t-howto{
+  border-radius: 14px;
+  box-shadow: 8px 8px 0 rgba(10,10,18,.62);
+  /* 右栏是一块深色磨砂板，让两栏一眼分得开 */
+  background: linear-gradient(160deg, rgba(16,18,34,.94), rgba(10,11,22,.97));
+  border-color: rgba(255,246,233,.22);
+}
+.t-rows{gap:14px}
+.t-row{
+  padding-bottom: 11px;
+  border-bottom: 1px dashed rgba(255,246,233,.14);
+}
+.t-row:last-child{border-bottom:none; padding-bottom:0}
+
+/* 角色卡：加左侧色条，选中的卡整张变亮 */
+.pick{
+  border-radius: 11px;
+  box-shadow: 4px 4px 0 rgba(10,10,18,.55);
+  transition: transform .12s cubic-bezier(.2,1.4,.4,1), box-shadow .12s, background .12s;
+  position: relative; overflow: hidden;
+}
+.pick::before{
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 6px;
+  background: var(--pcol, #7b2ff7);
+}
+.pick.on{ background: #fff; box-shadow: 4px 4px 0 var(--mag), 0 0 0 3px var(--ink) }
+.pick:hover{ transform: translate(-1px,-2px); box-shadow: 6px 6px 0 rgba(10,10,18,.55) }
+
+/* 密度：从四个按钮改成一条分段控件，选中项填满深色 */
+.rate{
+  display: flex; gap: 0; background: #e8e4dc; border: 3px solid var(--ink);
+  border-radius: 9px; padding: 3px; overflow: hidden;
+}
+.rate button{
+  flex: 1 1 0; border: none; background: transparent; border-radius: 6px;
+  padding: 9px 4px; font-family: var(--ui); font-weight: 800; font-size: 13px;
+  color: #5a5a68; cursor: pointer; transition: background .12s, color .12s;
+  letter-spacing: .04em;
+}
+.rate button:hover{ background: #d8d3c8; color: var(--ink) }
+.rate button.on{
+  background: var(--ink); color: var(--yel);
+  box-shadow: 2px 2px 0 rgba(10,10,18,.35);
+}
+
+/* 底部动作区 */
+.t-actions{
+  display: flex; gap: 10px; align-items: stretch;
+  width: 100%; max-width: min(1160px, 95vw);
+  margin-top: clamp(8px, 1.4vh, 14px);
+}
+.startbig{
+  flex: 1 1 auto;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 3px; line-height: 1.1;
+  border-radius: 12px !important;
+}
+.startbig .sbt{ font-size: clamp(20px, 2.2vw, 30px); letter-spacing: .16em }
+.startbig .sbs{
+  font-family: var(--ui); font-weight: 700; font-size: 10px;
+  letter-spacing: .14em; opacity: .72;
+}
+.codexbtn{
+  flex: 0 0 auto; min-width: 122px;
+  border-radius: 12px !important;
+  background: #fff; color: var(--ink);
+  font-size: clamp(14px, 1.2vw, 17px); letter-spacing: .14em;
+  border: 4px solid var(--ink); cursor: pointer;
+  box-shadow: 6px 6px 0 rgba(10,10,18,.6);
+  transition: transform .1s, box-shadow .1s;
+}
+.codexbtn:hover{ background: var(--yel) }
+.codexbtn:active{ transform: translate(3px,3px); box-shadow: 3px 3px 0 rgba(10,10,18,.6) }
+
+/* ══════════ 图鉴 ══════════ */
+#scr-codex{
+  background: rgba(8,10,24,.9);
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+  z-index: 34;
+}
+.codex-panel{
+  width: min(1120px, 96vw);
+  max-height: 94vh;
+  display: flex; flex-direction: column; gap: 11px;
+  background: var(--paper);
+  border: 5px solid var(--ink);
+  border-radius: 16px;
+  padding: clamp(13px,1.8vh,20px) clamp(14px,1.8vw,22px);
+  box-shadow: 12px 12px 0 rgba(10,10,18,.62);
+  color: var(--ink);
+}
+.codex-head{
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  flex: 0 0 auto;
+}
+.codex-title{ flex: 1 1 auto; min-width: 0 }
+.codex-title h2{
+  font-family: var(--disp); font-size: clamp(22px,2.4vw,30px); letter-spacing: .22em;
+  line-height: 1; margin: 0;
+}
+.codex-title s{
+  display: block; text-decoration: none; margin-top: 5px;
+  font-family: var(--ui); font-size: 11px; letter-spacing: .08em; color: #6b6b7a;
+}
+.codex-tabs{
+  display: flex; gap: 0; background: #e8e4dc; border: 3px solid var(--ink);
+  border-radius: 9px; padding: 3px;
+}
+.codex-tabs button{
+  border: none; background: transparent; border-radius: 6px; cursor: pointer;
+  padding: 8px 16px; font-family: var(--ui); font-weight: 800; font-size: 13px;
+  letter-spacing: .1em; color: #5a5a68; transition: background .12s, color .12s;
+}
+.codex-tabs button.on{ background: var(--ink); color: var(--yel) }
+.codex-tabs button:hover:not(.on){ background: #d8d3c8; color: var(--ink) }
+
+.codex-body{
+  flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(255px, 1fr));
+  gap: 12px; padding: 3px 5px 3px 2px;
+}
+.codex-body::-webkit-scrollbar{ width: 8px }
+.codex-body::-webkit-scrollbar-thumb{ background: #b9b4a8; border-radius: 4px }
+
+.cx-card{
+  background: #fff; border: 3px solid var(--ink); border-radius: 11px;
+  padding: 12px 13px; box-shadow: 4px 4px 0 rgba(10,10,18,.5);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.cx-head{ display: flex; align-items: center; gap: 10px }
+.cx-blob{
+  width: 46px; height: 46px; border-radius: 50%;
+  border: 3px solid var(--ink); flex: 0 0 46px;
+  position: relative; overflow: hidden;
+  box-shadow: 2px 2px 0 rgba(10,10,18,.4);
+}
+/* 用三个色块拼一个抽象剪影，对应目标的三主色 */
+.cx-blob i{ position: absolute; display: block; border-radius: 50% }
+.cx-name{
+  font-family: var(--disp); font-size: 17px; letter-spacing: .06em; line-height: 1.1;
+}
+.cx-tag{
+  display: inline-block; margin-top: 3px; padding: 1px 7px;
+  background: var(--ink); color: var(--yel); border-radius: 4px;
+  font-family: var(--ui); font-size: 10px; font-weight: 800; letter-spacing: .08em;
+}
+.cx-look{
+  font-size: 12px; line-height: 1.55; color: #3d3d4a;
+}
+.cx-look b{ color: var(--ink) }
+.cx-stats{
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px 10px;
+  border-top: 2px dotted #d8d3c8; padding-top: 8px;
+}
+.cx-stat{ display: flex; justify-content: space-between; font-size: 11px; color: #5a5a68 }
+.cx-stat b{ color: var(--ink); font-family: var(--disp); font-size: 12px }
+.cx-lv{
+  display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px;
+}
+.cx-lv span{
+  font-size: 10px; padding: 1px 6px; border-radius: 3px;
+  background: #eef2f7; color: #47506b; border: 1px solid #d6dce8;
+}
+.cx-lv span.hot{ background: var(--ink); color: var(--yel); border-color: var(--ink) }
+.cx-note{
+  font-size: 11px; line-height: 1.5; color: #7b2ff7; font-weight: 700;
+}
+.cx-evo{
+  font-size: 11px; color: #0a8f55; font-weight: 800;
+  border-top: 2px dotted #d8d3c8; padding-top: 7px;
+}
+.codex-foot{
+  flex: 0 0 auto; font-size: 10px; color: #7a7a8a; letter-spacing: .06em;
+  text-align: center;
+}
+
+/* 矮屏（手机横屏）：图鉴压成两列，卡片内容精简 */
+@media (max-height: 520px){
+  .codex-panel{ padding: 8px 10px; gap: 7px; border-width: 4px; border-radius: 11px }
+  .codex-title h2{ font-size: 18px; letter-spacing: .16em }
+  .codex-title s{ display: none }
+  .codex-tabs button{ padding: 5px 11px; font-size: 11px }
+  .codex-body{ grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px }
+  .cx-card{ padding: 8px 9px; gap: 5px; border-width: 2px }
+  .cx-blob{ width: 32px; height: 32px; flex-basis: 32px; border-width: 2px }
+  .cx-name{ font-size: 14px }
+  .cx-look{ font-size: 10.5px; line-height: 1.4 }
+  .cx-stats{ padding-top: 5px; gap: 2px 8px }
+  .cx-stat{ font-size: 10px }
+  .codex-foot{ display: none }
+  .t-actions{ margin-top: 6px }
+  .codexbtn{ min-width: 86px; font-size: 12px }
+  .startbig .sbs{ display: none }
 }
 </style>
 </head>
@@ -663,8 +883,8 @@ body.is-title canvas#gl{
 <!-- ══ 开始界面 ══ -->
 <div id="scr-title" class="screen">
   <header class="t-top">
-    <h1 class="logo">POW!<em>ARCHER</em></h1>
-    <div class="sub">爆裂弓箭手　墨潮割草</div>
+    <h1 class="logo">爆裂<em>弓箭手</em></h1>
+    <div class="sub">十波死斗 · 两大异兽</div>
   </header>
 
   <div class="t-body">
@@ -691,7 +911,13 @@ body.is-title canvas#gl{
     </aside>
   </div>
 
-  <button class="btn startbig" id="startbtn">开 始 对 战</button>
+  <div class="t-actions">
+    <button class="btn startbig" id="startbtn">
+      <span class="sbt">开 始 对 战</span>
+      <span class="sbs">十波 · 两个 BOSS · 全自动射击</span>
+    </button>
+    <button class="btn codexbtn" id="codexbtn">图 鉴</button>
+  </div>
   <div class="hint">点击任意处开启背景音乐 · MADE WITH WORKBUDDY</div>
 </div>
 
@@ -736,6 +962,26 @@ body.is-title canvas#gl{
   </div>
 </div>
 
+<!-- ══ 图鉴 ══ -->
+<div id="scr-codex" class="screen hide">
+  <div class="codex-panel">
+    <div class="codex-head">
+      <div class="codex-title">
+        <h2>图 鉴</h2>
+        <s>敌人 · 武器 · 被动，全部数值取自游戏内配置</s>
+      </div>
+      <div class="codex-tabs" id="codexTabs">
+        <button data-tab="monster" class="on">敌 人</button>
+        <button data-tab="weapon">武 器</button>
+        <button data-tab="passive">被 动</button>
+      </div>
+      <button class="btn sm alt" id="codexclose">关 闭</button>
+    </div>
+    <div class="codex-body" id="codexBody"></div>
+    <div class="codex-foot">颜色块是该目标在游戏里的实际配色，照着颜色就能认出它</div>
+  </div>
+</div>
+
 <!-- ══ 结算 ══ -->
 <div id="scr-over" class="screen hide">
   <div class="panel" style="max-width:min(620px,94vw)">
@@ -770,7 +1016,7 @@ body.is-title canvas#gl{
 
 <script>
 /* ══════════════════════════════════════════════════════════
-   POW! ARCHER — 爆裂弓箭手
+   爆裂弓箭手 · 单文件 3D 割草
    单文件 / 程序化几何 / 零外部素材
    ══════════════════════════════════════════════════════════ */
 /* 带 ?debug 打开时，把 JS 错误直接打在页面上，
@@ -1102,6 +1348,67 @@ var SFX = {
   chest: function(){ [392,523,659,880,1174].forEach(function(f,i){ setTimeout(function(){ tone(f,0.18,'triangle',0.18); }, i*55); }); },
   boss:  function(){ tone(70, 0.9, 'sawtooth', 0.3, 44); noise(0.8,0.14,120); },
   die:   function(){ [440,330,247,165].forEach(function(f,i){ setTimeout(function(){ tone(f,0.3,'sawtooth',0.2); }, i*110); }); },
+  /* 转场音统一由这三个负责：
+       whoosh     进游戏（大幅上扬，最明显）
+       whooshUp   从暂停恢复（短促上扬）
+       whooshDown 进暂停（短促下坠，和进场形成方向对比）
+     三个都是噪声带通扫频 + 一条正弦滑音，只是方向、时长、音量不同。 */
+  whooshUp: function(){
+    if(!AC || muted) return;
+    var t = AC.currentTime, dur = 0.34;
+    var src = AC.createBufferSource(); src.buffer = (function(){
+      var len = Math.floor(AC.sampleRate*dur), b = AC.createBuffer(1, len, AC.sampleRate);
+      var d = b.getChannelData(0);
+      for(var i=0;i<len;i++) d[i] = (Math.random()*2-1) * Math.pow(1 - i/len, 1.8);
+      return b;
+    })();
+    var f = AC.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 2.2;
+    f.frequency.setValueAtTime(560, t);
+    f.frequency.exponentialRampToValueAtTime(3400, t + dur);
+    var gn = AC.createGain();
+    gn.gain.setValueAtTime(0.0001, t);
+    gn.gain.linearRampToValueAtTime(0.26, t + 0.03);
+    gn.gain.exponentialRampToValueAtTime(0.0006, t + dur);
+    src.connect(f); f.connect(gn); gn.connect(masterGain);
+    src.start(t);
+    var o = AC.createOscillator(), og = AC.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(420, t);
+    o.frequency.exponentialRampToValueAtTime(1500, t + dur*0.8);
+    og.gain.setValueAtTime(0.0001, t);
+    og.gain.linearRampToValueAtTime(0.10, t + 0.03);
+    og.gain.exponentialRampToValueAtTime(0.0005, t + dur);
+    o.connect(og); og.connect(masterGain);
+    o.start(t); o.stop(t + dur + 0.02);
+  },
+  whooshDown: function(){
+    if(!AC || muted) return;
+    var t = AC.currentTime, dur = 0.30;
+    var src = AC.createBufferSource(); src.buffer = (function(){
+      var len = Math.floor(AC.sampleRate*dur), b = AC.createBuffer(1, len, AC.sampleRate);
+      var d = b.getChannelData(0);
+      for(var i=0;i<len;i++) d[i] = (Math.random()*2-1) * Math.pow(1 - i/len, 1.8);
+      return b;
+    })();
+    var f = AC.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 2.2;
+    f.frequency.setValueAtTime(2600, t);
+    f.frequency.exponentialRampToValueAtTime(380, t + dur);
+    var gn = AC.createGain();
+    gn.gain.setValueAtTime(0.0001, t);
+    gn.gain.linearRampToValueAtTime(0.24, t + 0.03);
+    gn.gain.exponentialRampToValueAtTime(0.0006, t + dur);
+    src.connect(f); f.connect(gn); gn.connect(masterGain);
+    src.start(t);
+    var o = AC.createOscillator(), og = AC.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(980, t);
+    o.frequency.exponentialRampToValueAtTime(300, t + dur*0.85);
+    og.gain.setValueAtTime(0.0001, t);
+    og.gain.linearRampToValueAtTime(0.09, t + 0.03);
+    og.gain.exponentialRampToValueAtTime(0.0005, t + dur);
+    o.connect(og); og.connect(masterGain);
+    o.start(t); o.stop(t + dur + 0.02);
+  },
   /* "咻" —— 进游戏的过场音。噪声做带通扫频 + 一条上滑正弦 */
   whoosh: function(){
     if(!AC || muted) return;
@@ -1141,29 +1448,84 @@ var SFX = {
    全部用 Web Audio 现场合成，不加载任何音频文件。
    用 16 分音符网格排谱，4 小节一循环，天然无缝。
    和声走 Am - F - C - G，两个模式共用，切模式只是换配器和速度。 */
+/* ═══════════════ 背景音乐 ═══════════════
+   全部用 Web Audio 现场合成：零音频文件、零版权风险、循环天然无缝。
+
+   曲式是「有结构的短曲」，不是四小节无限重复。三个场景各一首：
+     menu   （菜单）  82 BPM   8 小节
+     battle （战斗） 134 BPM  16 小节
+     boss   （BOSS） 152 BPM  16 小节，换调
+
+   「主歌 / 副歌 / 高潮」的差别体现在两件事上，不是靠改音量糊出来：
+     1. 声部数量：主歌只有低音和铺底，副歌加旋律，高潮全开
+     2. 节奏密度：主歌四分音符，副歌八分，高潮十六分 + 双踩
+
+   段落表 sec[] 按小节排。末尾几小节是减配器的过渡，接回第一小节，
+   所以循环点听不出来 —— 这一点是结构保证的，不靠淡入淡出掩饰。
+*/
 var BGM = (function(){
-  var g = null, playing = false, paused = false, mode = 'calm';
-  var vol = 0.28, muted = false;      // 音乐基准音量 + 总静音
+  var g = null, playing = false, paused = false, mode = 'menu';
+  var vol = 0.28, muted = false;
   var step = 0, nextTime = 0, timer = null, noiseBuf = null;
 
-  var TUNE = {
-    calm:   {bpm:84,  drums:false, arpEvery:2, lead:false, pad:true,  bassVol:0.38, arpVol:0.24, padVol:0.20},
-    battle: {bpm:132, drums:true,  arpEvery:1, lead:true,  pad:true,  bassVol:0.50, arpVol:0.32, padVol:0.13}
+  /* ── 三首曲子的骨架 ── */
+  var SONG = {
+    menu: {
+      bpm: 82, bars: 8, kit: 'soft',
+      /* Am9 · Fmaj7 · Cmaj7 · G6，比三和弦更柔，适合当背景 */
+      chords: [[57,60,64,67], [53,57,60,64], [48,52,55,59], [55,59,62,66]],
+      sec:    ['intro','intro','a','a','b','b','a','outro']
+    },
+    battle: {
+      bpm: 134, bars: 16, kit: 'full',
+      chords: [[57,60,64], [53,57,60], [48,52,55], [55,59,62]],
+      /* A 主歌 4 小节 → B 副歌 4 小节 → C 高潮 4 小节 → 回落 4 小节 */
+      sec:    ['a','a','a','a', 'b','b','b','b', 'c','c','c','c', 'a','a','b','b']
+    },
+    boss: {
+      bpm: 152, bars: 16, kit: 'heavy',
+      /* 换到 Dm · Bb · F · C，比战斗更暗，低音走八分音符持续推进 */
+      chords: [[50,53,57], [46,50,53], [41,45,48], [48,52,55]],
+      sec:    ['a','a','a','a', 'b','b','b','b', 'c','c','c','c', 'c','c','d','d']
+    }
   };
 
-  /* 四小节和弦：Am · F · C · G（MIDI 音高） */
-  var CHORDS = [
-    [57, 60, 64],
-    [53, 57, 60],
-    [48, 52, 55],
-    [55, 59, 62]
+  /* ── 段落配器表：这张表就是「起伏」本身 ──
+     bass  0 无 / 1 每拍 / 2 八分音符
+     arp   每小节发声次数（0 无 / 8 八分 / 16 十六分）
+     lead  0 无 / 1 中音区 / 2 高音区
+     kick  1 每半小节 / 2 每拍+反拍
+     snare 1 二四拍 / 2 反拍密集
+     hat   1 八分 / 2 四分 */
+  var SEC = {
+    intro: {bass:0, arp:0,  lead:0, pad:1, kick:0, snare:0, hat:0, crash:0},
+    a:     {bass:1, arp:8,  lead:0, pad:1, kick:1, snare:0, hat:2, crash:0},
+    b:     {bass:1, arp:8,  lead:1, pad:1, kick:1, snare:1, hat:2, crash:0},
+    c:     {bass:2, arp:16, lead:2, pad:1, kick:2, snare:2, hat:1, crash:1},
+    d:     {bass:1, arp:0,  lead:0, pad:1, kick:1, snare:0, hat:2, crash:0},
+    outro: {bass:0, arp:0,  lead:0, pad:1, kick:0, snare:0, hat:0, crash:0}
+  };
+
+  /* 旋律：每小节 8 个八分音，null 是休止。按「小节在 4 小节里的位置」取 */
+  var LEAD_MID = [
+    [72,null,76,79, null,76,72,null],
+    [69,null,72,76, null,72,69,null],
+    [72,null,76,79, null,81,79,null],
+    [74,null,71,67, null,71,74,null]
   ];
-  /* 主旋律，只在战斗模式出声。每小节 8 个八分音，null 是休止 */
-  var LEAD = [
-    [72, null, 76, 79, null, 76, 72, null],
-    [69, null, 72, 76, null, 72, 69, null],
-    [72, null, 76, 79, null, 81, 79, null],
-    [74, null, 71, 67, null, 71, 74, null]
+  /* 高潮段：更密、跨度更大，一上来就在高音区 */
+  var LEAD_TOP = [
+    [84,83,81,79, 76,79,81,84],
+    [81,79,76,72, 76,79,81,84],
+    [84,86,88,91, 88,86,84,81],
+    [79,81,83,86, 83,81,79,76]
+  ];
+  /* BOSS 的 riff：十六分音符，故意用小二度和三全音制造压迫感 */
+  var RIFF_BOSS = [
+    [62,65,69,62, 74,72,69,65],
+    [58,62,65,58, 70,69,65,62],
+    [53,57,60,53, 65,64,60,57],
+    [60,64,67,72, 71,67,64,60]
   ];
 
   function mtof(m){ return 440 * Math.pow(2, (m - 69) / 12); }
@@ -1178,79 +1540,185 @@ var BGM = (function(){
     return noiseBuf;
   }
 
-  function tone(t, f, dur, type, vol){
-    var o = AC.createOscillator(), gn = AC.createGain();
-    o.type = type;
-    o.frequency.setValueAtTime(f, t);
+  /* ── 乐器 ── */
+
+  /* 低音：锯齿过低通，比方波厚、比三角波有冲击力 */
+  function bassNote(t, midi, dur, v){
+    var o = AC.createOscillator(), f = AC.createBiquadFilter(), gn = AC.createGain();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(mtof(midi), t);
+    f.type = 'lowpass';
+    f.frequency.setValueAtTime(460, t);
+    f.frequency.exponentialRampToValueAtTime(170, t + dur*0.85);
     gn.gain.setValueAtTime(0, t);
-    gn.gain.linearRampToValueAtTime(vol, t + 0.008);
-    gn.gain.exponentialRampToValueAtTime(0.0006, t + dur);
-    o.connect(gn); gn.connect(g);
+    gn.gain.linearRampToValueAtTime(v, t + 0.012);
+    gn.gain.exponentialRampToValueAtTime(0.0008, t + dur);
+    o.connect(f); f.connect(gn); gn.connect(g);
     o.start(t); o.stop(t + dur + 0.03);
   }
-  function noiseHit(t, dur, vol, hp){
-    var src = AC.createBufferSource(); src.buffer = noiseBufGet();
-    var f = AC.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = hp;
-    var gn = AC.createGain();
-    gn.gain.setValueAtTime(vol, t);
-    gn.gain.exponentialRampToValueAtTime(0.0008, t + dur);
-    src.connect(f); f.connect(gn); gn.connect(g);
-    src.start(t); src.stop(t + dur + 0.02);
+
+  /* 分解和弦：方波，短促，芯片味就在方波的奇次谐波里 */
+  function arpNote(t, midi, dur, v){
+    var o = AC.createOscillator(), gn = AC.createGain();
+    o.type = 'square';
+    o.frequency.setValueAtTime(mtof(midi), t);
+    gn.gain.setValueAtTime(0, t);
+    gn.gain.linearRampToValueAtTime(v, t + 0.005);
+    gn.gain.exponentialRampToValueAtTime(0.0005, t + dur);
+    o.connect(gn); gn.connect(g);
+    o.start(t); o.stop(t + dur + 0.02);
   }
-  function kick(t){
+
+  /* 旋律：两路相差 7 音分，产生轻微合唱宽度。
+     dirty=true 时换锯齿波，给 BOSS 段用。 */
+  function leadNote(t, midi, dur, v, dirty){
+    var f0 = mtof(midi);
+    [0, 7].forEach(function(det){
+      var o = AC.createOscillator(), gn = AC.createGain();
+      o.type = dirty ? 'sawtooth' : 'square';
+      o.frequency.setValueAtTime(f0 * Math.pow(2, det/1200), t);
+      gn.gain.setValueAtTime(0, t);
+      gn.gain.linearRampToValueAtTime(v * (det ? 0.42 : 1), t + 0.01);
+      gn.gain.exponentialRampToValueAtTime(0.0005, t + dur);
+      o.connect(gn); gn.connect(g);
+      o.start(t); o.stop(t + dur + 0.02);
+    });
+  }
+
+  /* 铺底：整小节长音，慢起音。把音符之间的缝隙填住，也是「不干」的来源 */
+  function pad(t, chord, dur, v){
+    chord.forEach(function(m, idx){
+      var o = AC.createOscillator(), f = AC.createBiquadFilter(), gn = AC.createGain();
+      o.type = 'triangle';
+      o.frequency.setValueAtTime(mtof(m - 12), t);
+      f.type = 'lowpass'; f.frequency.value = 720;
+      var pk = v * (0.92 - idx*0.11);
+      gn.gain.setValueAtTime(0, t);
+      gn.gain.linearRampToValueAtTime(pk, t + 0.32);
+      gn.gain.setValueAtTime(pk, t + dur*0.7);
+      gn.gain.exponentialRampToValueAtTime(0.0006, t + dur);
+      o.connect(f); f.connect(gn); gn.connect(g);
+      o.start(t); o.stop(t + dur + 0.06);
+    });
+  }
+
+  function kick(t, v){
     var o = AC.createOscillator(), gn = AC.createGain();
     o.type = 'sine';
-    o.frequency.setValueAtTime(160, t);
-    o.frequency.exponentialRampToValueAtTime(48, t + 0.11);
-    gn.gain.setValueAtTime(0.8, t);
+    o.frequency.setValueAtTime(165, t);
+    o.frequency.exponentialRampToValueAtTime(46, t + 0.105);
+    gn.gain.setValueAtTime((v||0.9), t);
     gn.gain.exponentialRampToValueAtTime(0.001, t + 0.17);
     o.connect(gn); gn.connect(g);
     o.start(t); o.stop(t + 0.2);
   }
 
-  /* 提前 120 毫秒排未来要响的音，用系统时间而不是帧时间来驱动 */
+  function snare(t, v){
+    var src = AC.createBufferSource(); src.buffer = noiseBufGet();
+    var f = AC.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 1900; f.Q.value = 0.9;
+    var gn = AC.createGain();
+    gn.gain.setValueAtTime(v, t);
+    gn.gain.exponentialRampToValueAtTime(0.0008, t + 0.125);
+    src.connect(f); f.connect(gn); gn.connect(g);
+    src.start(t); src.stop(t + 0.15);
+    /* 叠一条短促的实体音，让军鼓有厚度 */
+    var o = AC.createOscillator(), og = AC.createGain();
+    o.type = 'triangle'; o.frequency.setValueAtTime(210, t);
+    o.frequency.exponentialRampToValueAtTime(150, t + 0.08);
+    og.gain.setValueAtTime(v*0.55, t);
+    og.gain.exponentialRampToValueAtTime(0.0008, t + 0.09);
+    o.connect(og); og.connect(g);
+    o.start(t); o.stop(t + 0.11);
+  }
+
+  function hat(t, v, open){
+    var src = AC.createBufferSource(); src.buffer = noiseBufGet();
+    var f = AC.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 7600;
+    var gn = AC.createGain();
+    var dur = open ? 0.14 : 0.035;
+    gn.gain.setValueAtTime(v, t);
+    gn.gain.exponentialRampToValueAtTime(0.0006, t + dur);
+    src.connect(f); f.connect(gn); gn.connect(g);
+    src.start(t); src.stop(t + dur + 0.02);
+  }
+
+  function crash(t, v){
+    var src = AC.createBufferSource(); src.buffer = noiseBufGet();
+    var f = AC.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 4200;
+    var gn = AC.createGain();
+    gn.gain.setValueAtTime(v, t);
+    gn.gain.exponentialRampToValueAtTime(0.0006, t + 0.85);
+    src.connect(f); f.connect(gn); gn.connect(g);
+    src.start(t); src.stop(t + 0.9);
+  }
+
+  /* 提前 120 毫秒把未来要响的音排进队列，用系统时间驱动而不是帧时间。
+     这样即使掉帧，节奏也不会飘。 */
   function schedule(){
     if(!playing || paused || !AC || !g) return;
-    var cfg = TUNE[mode];
-    var stepDur = (60 / cfg.bpm) / 4;
+    var song = SONG[mode];
+    var stepDur = (60 / song.bpm) / 4;   // 十六分音符时长
     var guard = 0;
-    while(nextTime < AC.currentTime + 0.12 && guard < 40){
+    while(nextTime < AC.currentTime + 0.12 && guard < 48){
       guard++;
-      var bar = Math.floor(step/16) % 4;
-      var s = step % 16;
-      var t = nextTime;
-      var ch = CHORDS[bar];
+      var bar   = Math.floor(step / 16);
+      var s     = step % 16;
+      var barIn = bar % 4;
+      var sec   = SEC[song.sec[bar % song.bars]];
+      var ch    = song.chords[barIn];
+      var t     = nextTime;
 
-      // 底噪铺底：每小节一个长音，把音符之间的空隙填住
-      if(cfg.pad && s === 0) tone(t, mtof(ch[0] - 24), stepDur*15, 'triangle', cfg.padVol);
+      /* 铺底：每小节一次 */
+      if(sec.pad && s === 0) pad(t, ch, stepDur * 15.2, 0.075);
 
-      // 低音：每拍根音，降一个八度
-      if(s % 4 === 0) tone(t, mtof(ch[0] - 12), stepDur*3.4, 'triangle', cfg.bassVol);
+      /* 低音 */
+      if(sec.bass === 1 && s % 4 === 0) bassNote(t, ch[0] - 12, stepDur * 3.6, 0.30);
+      else if(sec.bass === 2 && s % 2 === 0) bassNote(t, ch[0] - 12, stepDur * 1.7, 0.27);
 
-      // 分解和弦：菜单是八分音，战斗是十六分音
-      if(s % cfg.arpEvery === 0){
-        var ai = Math.floor(s / cfg.arpEvery) % 3;
-        var oct = (s % 8 < 4) ? 12 : 24;
-        tone(t, mtof(ch[ai] + oct), stepDur*1.2, 'square', cfg.arpVol);
+      /* 分解和弦 */
+      if(sec.arp){
+        var gap = 16 / sec.arp;
+        if(s % gap === 0){
+          var ai = Math.floor(s / gap) % 3;
+          var oct = (Math.floor(s / gap) % 2) ? 12 : 24;
+          arpNote(t, ch[ai] + oct, stepDur * 1.1, 0.075);
+        }
       }
 
-      // 主旋律：只在战斗模式
-      if(cfg.lead && s % 2 === 0){
-        var n = LEAD[bar][s/2];
-        if(n) tone(t, mtof(n), stepDur*1.7, 'square', 0.16);
+      /* 旋律 */
+      if(sec.lead === 1 && s % 2 === 0){
+        var n1 = LEAD_MID[barIn][s / 2];
+        if(n1) leadNote(t, n1, stepDur * 1.9, 0.085);
+      } else if(sec.lead === 2){
+        if(song.kit === 'heavy'){
+          var rb = RIFF_BOSS[barIn][s];
+          if(rb) leadNote(t, rb, stepDur * 0.9, 0.072, true);
+        } else if(s % 2 === 0){
+          var n2 = LEAD_TOP[barIn][s / 2];
+          if(n2) leadNote(t, n2, stepDur * 1.7, 0.075);
+        }
       }
 
-      // 鼓
-      if(cfg.drums){
-        if(s === 0 || s === 8) kick(t);
-        if(s === 4 || s === 12) noiseHit(t, 0.11, 0.26, 1200);
-        if(s % 2 === 0) noiseHit(t, 0.03, 0.09, 7000);
-      } else if(s === 8){
-        noiseHit(t, 0.05, 0.05, 6000);
+      /* 鼓组 */
+      if(song.kit === 'heavy'){
+        if(sec.kick === 2 && (s % 4 === 0 || s === 6 || s === 14)) kick(t, s % 4 === 0 ? 0.95 : 0.55);
+        if(sec.kick === 1 && (s === 0 || s === 8)) kick(t, 0.85);
+        if(sec.snare === 2 && (s === 4 || s === 12)) snare(t, 0.34);
+        if(sec.snare === 1 && (s === 4 || s === 12)) snare(t, 0.30);
+        if(sec.hat === 1 && s % 2 === 0) hat(t, s % 4 === 0 ? 0.085 : 0.05);
+        if(sec.hat === 2 && s % 4 === 0) hat(t, 0.055);
+      } else {
+        if(sec.kick === 1 && (s === 0 || s === 8)) kick(t, 0.85);
+        if(sec.kick === 2 && (s === 0 || s === 4 || s === 8 || s === 12)) kick(t, 0.85);
+        if(sec.snare === 1 && (s === 4 || s === 12)) snare(t, 0.26);
+        if(sec.snare === 2 && (s === 2 || s === 6 || s === 10 || s === 14)) snare(t, 0.22);
+        if(sec.hat === 1 && s % 2 === 0) hat(t, 0.07);
+        if(sec.hat === 2 && s % 4 === 0) hat(t, 0.05);
       }
+      if(sec.crash && s === 0 && bar % 4 === 0) crash(t, 0.16);
 
       nextTime += stepDur;
-      step = (step + 1) % 64;
+      step = (step + 1) % (song.bars * 16);
     }
   }
 
@@ -1274,7 +1742,7 @@ var BGM = (function(){
       if(!g) this.init();
       if(!g) return;
       if(playing){ this.setMode(m || mode); return; }
-      mode = m || 'calm';
+      mode = m || 'menu';
       playing = true;
       paused = false;
       step = 0;
@@ -1283,12 +1751,20 @@ var BGM = (function(){
       timer = setInterval(schedule, 25);
       this._apply(1.4);
     },
+    /* 换曲：先压到静音再抬起来，用时 0.6 秒。
+       和外部播的「咻」叠在一起，听起来是转场而不是断掉。
+       注意这里直接操作 gain，不要走 _apply，否则抬起来会被覆盖。 */
     setMode: function(m){
-      if(!playing){ mode = m; return; }
       if(mode === m) return;
       mode = m;
       step = 0;
       nextTime = AC.currentTime + 0.1;
+      if(!playing || !g || !AC) return;
+      var target = (muted || paused) ? 0.0001 : vol;
+      g.gain.cancelScheduledValues(AC.currentTime);
+      g.gain.setValueAtTime(Math.max(g.gain.value, 0.0001), AC.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.0001, AC.currentTime + 0.09);
+      g.gain.exponentialRampToValueAtTime(Math.max(target, 0.0001), AC.currentTime + 0.62);
     },
     stop: function(){
       if(!playing) return;
@@ -1296,7 +1772,7 @@ var BGM = (function(){
       if(timer){ clearInterval(timer); timer = null; }
       this._apply(0.35);
     },
-    /* 暂停：停掉调度器并淡出。恢复时从当前位置重排，不重头播 */
+    /* 暂停：停掉调度器并淡出。恢复时从当前位置续播，不重头播 */
     pause: function(){
       if(!playing || paused) return;
       paused = true;
@@ -1321,6 +1797,7 @@ var BGM = (function(){
       this._apply(0.18);
     },
     isMuted: function(){ return muted; },
+    getMode: function(){ return mode; },
     _tap: function(){ return g; },
     isPlaying: function(){ return playing; },
     isPaused: function(){ return paused; }
@@ -1330,7 +1807,7 @@ function unlockAudio(){
   audioInit();
   if(AC && AC.state === 'suspended') AC.resume();
   /* 浏览器要求用户手势之后才能出声，所以音乐在第一次点击/按键时启动 */
-  if(AC && !BGM.isPlaying()) BGM.start('calm');
+  if(AC && !BGM.isPlaying()) BGM.start('menu');
 }
 addEventListener('pointerdown', unlockAudio, {once:false});
 addEventListener('keydown', unlockAudio, {once:false});
@@ -1777,44 +2254,205 @@ function renderEnemies(){
 
 /* ═══════════ BOSS ═══════════ */
 var boss = null;
-function buildBoss(x, z, hp){
+/* ═══════════ 两个 BOSS ═══════════
+   第 5 波：裂口巨兽 —— 四足爬行，靠冲锋和震地压人，近身威胁大
+   第 10 波：千手墨神 —— 人形浮空，八臂展开，远程弹幕为主，会瞬移
+
+   两个从外形到行为都不同：一个贴地、一个悬浮；一个追你、一个躲你；
+   一个靠身体撞、一个靠弹幕封走位。玩家换打法，不是换血条数字。
+*/
+function buildBoss(x, z, hp, kind){
   var g = new THREE.Group();
-  var core = part(new THREE.IcosahedronGeometry(2.0, 1), 0x1b0f36, 1.06);
-  g.add(core);
-  var shell = part(new THREE.IcosahedronGeometry(2.15, 0), COS.mag, 1.04);
-  shell.material.transparent = true; shell.material.opacity = 0.35;
-  g.add(shell);
-  // 角
-  for(var i=0;i<5;i++){
-    var a = i/5*TAU;
-    var horn = part(new THREE.ConeGeometry(0.26, 1.5, 5), COS.yel, 1.12);
-    horn.position.set(Math.cos(a)*1.7, 0.9, Math.sin(a)*1.7);
-    horn.rotation.z = -Math.cos(a)*0.7; horn.rotation.x = Math.sin(a)*0.7;
-    g.add(horn);
+  var baseY;
+
+  /* 两个模型都按「俯视构图」重排过一次。
+     第一版是按正面视角搭的：嘴朝前、手臂往后，结果相机在正上方往下看，
+     嘴埋在身体里、八条手臂全被躯干挡住，看上去只是一个紫色团块。
+     现在所有辨识特征都摊在水平面上：巨兽的嘴是俯视可见的 V 形开口，
+     墨神的八条手臂是放射状平铺。 */
+
+  if(kind === 'hands'){
+    /* ══ 千手墨神 ══
+       俯视看是一朵八瓣放射的花：中心躯干，八条青色手臂平铺向外，
+       末端是黄色爪。这样从任何角度都能立刻认出「千手」两个字。 */
+    var BODY = 0x3b2a72, ARM = 0x00e5ff, EYE = 0xffe600;
+    baseY = 3.0;
+
+    /* 躯干：上细下粗的柱，俯视是一个圆 */
+    var torso = part(new THREE.CylinderGeometry(0.66, 0.98, 2.1, 12), BODY, 1.05);
+    torso.position.y = 0.1; g.add(torso);
+
+    /* 肩盘：把八条手臂的根部收在一个明显的圆盘上 */
+    var shoulder = part(new THREE.CylinderGeometry(0.86, 0.78, 0.34, 12), 0x241a4a, 1.04);
+    shoulder.position.y = 1.18; g.add(shoulder);
+
+    /* 头 + 一只竖着的黄眼 */
+    var head = part(new THREE.SphereGeometry(0.6, 14, 12), BODY, 1.05);
+    head.position.y = 1.62; g.add(head);
+    var eye = new THREE.Mesh(new THREE.SphereGeometry(0.33, 12, 10),
+      new THREE.MeshBasicMaterial({color: EYE}));
+    eye.scale.set(0.72, 1.3, 0.8);
+    eye.position.set(0, 1.66, 0.42); g.add(eye);
+    var pupil = new THREE.Mesh(new THREE.SphereGeometry(0.125, 10, 8),
+      new THREE.MeshBasicMaterial({color: 0x0a0a12}));
+    pupil.position.set(0, 1.66, 0.66); g.add(pupil);
+    g.userData.pupil = pupil;
+
+    /* 裙摆：开口锥体，营造「飘浮」的感觉 */
+    var skirt = part(new THREE.ConeGeometry(1.05, 2.1, 12, 1, true), BODY, 1.04);
+    skirt.position.y = -1.15; skirt.rotation.x = Math.PI;
+    g.add(skirt);
+
+    /* 八条手臂：以 45° 间隔平铺，本地 +z 指向外。
+       每只手两段 + 一个爪，长短错开形成层次。 */
+    g.userData.arms = [];
+    for(var i2=0;i2<8;i2++){
+      var ang = i2 / 8 * TAU;
+      var arm = new THREE.Group();
+      arm.position.set(Math.sin(ang) * 0.78, 1.14 + (i2 % 2) * 0.16, Math.cos(ang) * 0.78);
+      arm.rotation.y = ang;
+
+      var lower = part(new THREE.BoxGeometry(0.19, 0.19, 1.5), ARM, 1.0);
+      lower.position.z = 0.75; arm.add(lower);
+
+      var elbow = part(new THREE.SphereGeometry(0.14, 8, 6), EYE, 1.0);
+      elbow.position.z = 1.5; arm.add(elbow);
+
+      /* 第二段向外再折一下，末端张开更宽 */
+      var upper = part(new THREE.BoxGeometry(0.15, 0.15, 1.0), ARM, 1.0);
+      upper.position.set(0, 0, 1.98);
+      upper.rotation.y = 0.42 * (i2 % 2 ? 1 : -1);
+      arm.add(upper);
+
+      var claw = part(new THREE.ConeGeometry(0.21, 0.72, 5), EYE, 1.0);
+      claw.position.set(0.18 * (i2 % 2 ? 1 : -1), 0, 2.5);
+      claw.rotation.x = Math.PI / 2;
+      arm.add(claw);
+
+      /* 记下基准角和摆动相位。
+         坑：v2 的模型没写 userData.rz，而 updateHandsBoss 里算的是
+         arm.rotation.z = userData.rz + 摆动值 → undefined + 数字 = NaN，
+         矩阵直接失效，八条手臂一个都不渲染。 */
+      arm.userData.baseAng = ang;
+      arm.userData.phase = i2 * 0.8;
+      g.add(arm);
+      g.userData.arms.push(arm);
+    }
+
+    /* 两圈反向旋转的能量环 */
+    var h1 = new THREE.Mesh(new THREE.TorusGeometry(2.55, 0.07, 6, 40),
+      new THREE.MeshBasicMaterial({color: COS.cyn, transparent:true, opacity:0.8}));
+    h1.rotation.x = Math.PI/2; h1.position.y = -1.95; g.add(h1);
+    var h2 = new THREE.Mesh(new THREE.TorusGeometry(1.85, 0.055, 6, 36),
+      new THREE.MeshBasicMaterial({color: COS.mag, transparent:true, opacity:0.75}));
+    h2.rotation.x = Math.PI/2; h2.position.y = -2.3; g.add(h2);
+    g.userData.ring1 = h1; g.userData.ring2 = h2;
+
+  } else {
+    /* ══ 裂口巨兽 ══
+       俯视构图：一张巨大的紫色圆饼，正前方挖开一个红色大嘴，
+       嘴沿排一圈白牙，两只黄眼在嘴后方。
+       前两版失败的原因都是「嘴朝向相机看不到的方向」——
+       相机在正上方偏后，向前伸的嘴被自己的身体挡住。
+       现在嘴开在水平面上，占身体三分之一的面积，俯视就是一张脸。 */
+    var BODY2 = 0x3d1a5e, GUM = 0xc0164e, TOOTH = 0xfff6e9, EYE2 = 0xffe600;
+    baseY = 2.0;
+
+    /* 躯干：厚圆饼，边缘用略深的颜色压一圈，形成轮廓层次 */
+    var body = part(new THREE.CylinderGeometry(1.75, 1.6, 0.85, 16), BODY2, 1.03);
+    body.position.set(0, 0, -0.55);
+    g.add(body);
+
+    /* 头部平台：向前伸出一段，承载嘴巴 */
+    var snout = part(new THREE.CylinderGeometry(1.28, 1.45, 0.62, 14), 0x2c1145, 1.03);
+    snout.position.set(0, 0.06, 1.45);
+    g.add(snout);
+
+    /* 口腔：圆形深红坑，是俯视的第一视觉焦点 */
+    var gum = new THREE.Mesh(new THREE.CylinderGeometry(1.02, 0.9, 0.34, 18),
+      new THREE.MeshBasicMaterial({color: GUM}));
+    gum.position.set(0, 0.44, 1.6);
+    g.add(gum);
+    /* 口腔内圈再压一层更深的色，看起来有纵深 */
+    var throat = new THREE.Mesh(new THREE.CylinderGeometry(0.56, 0.34, 0.26, 14),
+      new THREE.MeshBasicMaterial({color: 0x3a0417}));
+    throat.position.set(0, 0.52, 1.6);
+    g.add(throat);
+    g.userData.jawD = gum;
+
+    /* 牙齿：沿口腔圆周均匀排 10 颗，全部朝圆心咬 */
+    for(var t3=0;t3<10;t3++){
+      var ta = t3 / 10 * TAU;
+      var tooth = part(new THREE.ConeGeometry(0.15, 0.52, 4), TOOTH, 1.0);
+      tooth.position.set(
+        Math.sin(ta) * 1.06,
+        0.5,
+        1.6 + Math.cos(ta) * 1.06
+      );
+      /* 锥体默认朝 +Y，往前倒 90° 让它横着指向圆心 */
+      tooth.rotation.set(Math.PI/2, 0, 0);
+      tooth.rotation.y = ta;
+      g.add(tooth);
+    }
+
+    /* 两只大眼，在嘴后方两侧，俯视清晰可见 */
+    [[-1.32, 0.62, 0.5], [1.32, 0.62, 0.5]].forEach(function(p5){
+      var ey = new THREE.Mesh(new THREE.SphereGeometry(0.26, 12, 10),
+        new THREE.MeshBasicMaterial({color: EYE2}));
+      ey.position.set(p5[0], p5[1], p5[2]);
+      g.add(ey);
+      var pu = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 6),
+        new THREE.MeshBasicMaterial({color: 0x0a0a12}));
+      pu.position.set(p5[0], p5[1] + 0.02, p5[2] + 0.2);
+      g.add(pu);
+    });
+
+    /* 背脊：五根洋红尖刺沿中线往后，俯视是几颗亮点 */
+    for(var sp3=0;sp3<5;sp3++){
+      var spike2 = part(new THREE.ConeGeometry(0.19, 0.9 - sp3*0.1, 5), COS.mag, 1.0);
+      spike2.position.set(0, 0.58, -0.2 - sp3 * 0.5);
+      g.add(spike2);
+    }
+
+    /* 四条腿：从饼的边缘向外伸，落地 */
+    [[-1.55, 0.15], [1.55, 0.15], [-1.45, -1.35], [1.45, -1.35]].forEach(function(p6){
+      var leg = part(new THREE.BoxGeometry(0.36, 1.5, 0.36), 0x22103a, 1.03);
+      leg.position.set(p6[0], -0.72, p6[1]);
+      leg.rotation.z = p6[0] > 0 ? -0.26 : 0.26;
+      g.add(leg);
+      var foot = part(new THREE.BoxGeometry(0.46, 0.24, 0.62), 0x22103a, 1.03);
+      foot.position.set(p6[0] * 1.2, -1.44, p6[1] + 0.06);
+      g.add(foot);
+    });
+
+    /* 贴地暗环 */
+    var ring = new THREE.Mesh(new THREE.RingGeometry(2.15, 2.85, 32),
+      new THREE.MeshBasicMaterial({color: COS.mag, transparent:true, opacity:0.32,
+        side:THREE.DoubleSide, depthWrite:false}));
+    ring.rotation.x = -Math.PI/2; ring.position.set(0, -1.5, -0.3);
+    g.add(ring);
+    g.userData.ring1 = ring;
   }
-  // 眼
-  var eye = new THREE.Mesh(new THREE.SphereGeometry(0.42, 12, 10),
-    new THREE.MeshBasicMaterial({color:0xff2e88}));
-  eye.position.set(0, 0.3, 1.85); g.add(eye);
-  var eye2 = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 8),
-    new THREE.MeshBasicMaterial({color:0xffffff}));
-  eye2.position.set(0, 0.34, 2.12); g.add(eye2);
 
-  // 光环
-  var halo = new THREE.Mesh(new THREE.TorusGeometry(2.9, 0.09, 6, 40),
-    new THREE.MeshBasicMaterial({color:COS.cyn}));
-  halo.rotation.x = Math.PI/2; halo.position.y = -0.4;
-  g.add(halo);
-  g.userData.halo = halo;
-
-  g.position.set(x, 2.1, z);
+  g.scale.setScalar(1.15);
+  g.position.set(x, baseY - 6, z);
   scene.add(g);
+
   return {
-    obj:g, x:x, z:z, hp:hp, maxhp:hp, r:2.1, dmg:26, ang:0,
-    dead:false, boss:true, t:0, cd:2, dashCd:4, dash:0, dashDir:{x:0,z:1},
-    spawnCd:5, phase:0
+    obj: g, x: x, z: z, hp: hp, maxhp: hp,
+    kind: kind,
+    r: kind === 'hands' ? 2.1 : 2.3,
+    dmg: kind === 'hands' ? 24 : 30,
+    baseY: baseY,
+    ang: 0, t: 0, dead: false, boss: true,
+    rise: 1.5, riseMax: 1.5,
+    state: 'idle', stateT: 0,
+    cd: 2.2, dashCd: 3.4, slamCd: 5.5, tpCd: 5.0, orbCd: 3.6,
+    dashDir: {x:0, z:1},
+    rage: false
   };
 }
+
 function killBoss(){
   if(!boss) return;
   burst(boss.x, 2.2, boss.z, COS.mag, 40, 15, 1.6);
@@ -1824,6 +2462,8 @@ function killBoss(){
   flash(0.55);
   shake(0.8);
   SFX.boss();
+  BGM.setMode('battle');
+  bossBar.style.display = 'none';
   boss = null;
 }
 
@@ -2198,7 +2838,11 @@ function buildChoices(){
     if(w.lv < WDEF[w.id].max) opts.push({t:'wup', id:w.id});
   });
   // 3. 新武器
-  if(hero.weapons.length < 3){
+  /* 武器槽一共 4 个，但原来卡池写死 < 3，玩家永远拿不到第 4 把，
+     右下角第 4 个槽一直空着。现在前 3 把随时可拿，第 4 把留到第 8 波之后——
+     既让 4 个槽都有用，又不会让前中期变简单（前中期多一把武器会显著降低难度）。 */
+  var wLimit = S.wave >= 8 ? 4 : 3;
+  if(hero.weapons.length < wLimit){
     WKEYS.forEach(function(id){ if(!hasWeapon(id)) opts.push({t:'wnew', id:id}); });
   }
   // 4. 被动
@@ -2229,7 +2873,15 @@ function buildChoices(){
 function openLevelUp(refresh){
   if(!refresh && S.mode !== 'play') return;
   S.mode = 'level';
-  if(!refresh){ SFX.level(); flash(0.22); }
+  if(!refresh){
+    SFX.level(); flash(0.22);
+    /* 升级是玩家看不见摸不着的事（经验球自己飞过来），
+       所以在角色脚下补一圈金色扩散，把「升级」这个事件钉在画面上。 */
+    shock(hero.x, hero.z, COS.yel, 6.5, 0.7);
+    burst(hero.x, 1.1, hero.z, COS.yel, 14, 9, 1.1);
+    var lsp = toScreen(hero.x, 2.2, hero.z);
+    popWord('LEVEL UP', lsp.x, lsp.y - 20, '#ffe600', 34);
+  }
   var cs = buildChoices();
   var box = $('cards');
   box.innerHTML = '';
@@ -2244,11 +2896,15 @@ function openLevelUp(refresh){
       gain = 'Lv.' + w.lv + ' → Lv.' + (w.lv + 1);
       ds = d.lv[w.lv];
     } else if(c.t === 'wnew'){
+      /* 原来写「新武器 / Lv.1 解锁」，玩家在快速点卡时很容易以为是普通升级，
+         后来发现背包里多了一把，就会觉得「我没选过它怎么自己出现了」。
+         现在直接说清：会多一把、占掉一个槽位、槽位从几变几。 */
       var d2 = WDEF[c.id];
       nm = d2.name; ic = d2.short; col = d2.col;
-      kd = '新武器';
-      gain = 'Lv.1 解锁';
+      kd = '新武器 · 会占一个槽位';
+      gain = '武器 ' + hero.weapons.length + ' 把 → ' + (hero.weapons.length + 1) + ' 把';
       ds = d2.lv[0];
+      el.classList.add('newc');
     } else if(c.t === 'pas'){
       var p = PDEF[c.id], lvp = (hero.passives[c.id]||0);
       nm = p.name; ic = p.short; col = p.col;
@@ -2576,11 +3232,8 @@ canvas.addEventListener('pointercancel', endStick);
 var bossBar = document.createElement('div');
 bossBar.style.cssText = 'position:absolute;left:50%;top:132px;transform:translateX(-50%);' +
   'width:min(420px,74vw);display:none;pointer-events:none';
-bossBar.innerHTML = '<div style="font-family:var(--disp);font-size:11px;letter-spacing:.28em;' +
-  'color:#ff2e88;text-align:center;text-shadow:2px 2px 0 #0a0a12;margin-bottom:3px">MOLOCH · 墨魔王</div>' +
-  '<div style="height:12px;background:rgba(10,10,18,.85);border:3px solid #0a0a12">' +
-  '<i id="bosshp" style="display:block;height:100%;width:100%;' +
-  'background:linear-gradient(90deg,#7b2ff7,#ff2e88,#ffe600);transition:width .1s"></i></div>';
+/* 初始只留空壳，名字和配色由 setBossBar() 按 BOSS 类型填 */
+bossBar.innerHTML = '';
 $('hud').appendChild(bossBar);
 
 function fmtTime(t){
@@ -2661,6 +3314,9 @@ function spawnRing(){
 }
 
 function updateSpawn(dt){
+  /* BOSS 在场（且已经升起）时不刷小兵。
+     这是「单挑」成立的前提：玩家只需要读 BOSS 的招式，不用同时躲杂兵。 */
+  if(boss && !boss.dead) return;
   var wc = waveCurve(S.wave, S.waveLen ? S.waveT/S.waveLen : 0);
   var rate = (1.35 + S.wave*0.5) * wc.rate * S.spawnMul;
   var cap = Math.min(MAX_ENEMY, 24 + S.wave*13) * (S.spawnMul > 1.4 ? 1.25 : 1);
@@ -2684,28 +3340,90 @@ function nextWave(){
   if(S.wave === 5 || S.wave === 10){ spawnBoss(); }
 }
 
-/* 各波次「标准配装」的预期 DPS，与 docs/POW_ARCHER_数值策划表.xlsx 的
+/* 各波次「标准配装」的预期 DPS，与 docs/爆裂弓箭手_数值分析表.xlsx 的
    「玩家成长 · 建议DPS」列一一对应。BOSS 血量由它反推，
    这样 BOSS 战时长稳定在 12-18 秒，不会因为写死一个常数而崩。
    改武器或被动参数后，必须重跑 build_numbers.py 同步这张表。 */
 var EXPECTED_DPS = [13, 32, 87, 127, 451, 693, 760, 1227, 1629, 2387];
 
-function spawnBoss(){
-  if(boss){ scene.remove(boss.obj); boss = null; }
-  var ed = EXPECTED_DPS[clamp(S.wave, 1, 10) - 1];
-  var targetTtk = S.wave >= 10 ? 18 : 12;
-  var hp = Math.round(ed * targetTtk);
-  var a = Math.random()*TAU, r = 16;
-  var bx = clamp(Math.cos(a)*r, -ARENA_R+6, ARENA_R-6);
-  var bz = clamp(Math.sin(a)*r, -ARENA_R+6, ARENA_R-6);
-  boss = buildBoss(bx, bz, hp);
-  bossSpawned = true;
-  SFX.boss(); flash(0.5); shake(1.1);
-  toast('BOSS 降临', '#ff2e88');
-  shock(bx, bz, COS.mag, 12, 0.9);
+/* 清场：BOSS 登场时小兵全部震散。
+   以前是小兵和 BOSS 混在一起打，玩家分不清该躲谁，
+   BOSS 的招式也全被杂兵挡住。现在先清场再单挑。 */
+function clearMinionsForBoss(){
+  var total = 0;
+  EKEYS.forEach(function(k){
+    var list = E[k];
+    total += list.length;
+    for(var i=0;i<list.length;i++){
+      var e = list[i];
+      burst(e.x, 0.7, e.z, ETYPES[k].color, 4, 6, 0.55);
+      /* 原来每只小兵掉一颗经验球，一清场就是满地绿点，把 BOSS 的
+         弹幕和冲锋预警全遮住了。改成只有 1/4 概率掉，够补一点经验就行。 */
+      if(Math.random() < 0.25) spawnGem(e.x, e.z, 1);
+    }
+    list.length = 0;
+  });
+  return total;
 }
 
-/* ═══════════ 玩家更新 ═══════════ */
+function spawnBoss(){
+  if(boss){ scene.remove(boss.obj); boss = null; }
+
+  var kind = S.wave >= 10 ? 'hands' : 'maw';
+
+  /* 血量按「预估 DPS × 目标秒数」派生，不是常数。
+     BOSS 期间不刷小兵，玩家可以全力输出，所以目标秒数比之前长：
+     第 5 波 16 秒、第 10 波 28 秒，配合狂暴阶段形成两段压力。 */
+  var ed = EXPECTED_DPS[clamp(S.wave, 1, 10) - 1];
+  var targetTtk = kind === 'hands' ? 28 : 16;
+  var hp = Math.round(ed * targetTtk);
+
+  /* ── 出场序列：清场 → 白闪震屏 → 从地下升起 ── */
+  var cleared = clearMinionsForBoss();
+  if(cleared > 0) SFX.kill();
+  flash(0.42); shake(1.2);
+  shock(hero.x, hero.z, COS.cyn, 18, 0.8);
+  speedLines(0.85, 260);
+
+  /* 生成在玩家「正前方 9 单位」而不是地图随机点：
+     随机点常常落在视野边缘，玩家听到 BOSS 音乐却找不到它。
+     取玩家当前朝向（hero.ang），保证一登场就在镜头里。 */
+  var fa = hero.ang || 0;
+  var bx = clamp(hero.x + Math.sin(fa) * 9, -ARENA_R+6, ARENA_R-6);
+  var bz = clamp(hero.z + Math.cos(fa) * 9, -ARENA_R+6, ARENA_R-6);
+
+  boss = buildBoss(bx, bz, hp, kind);
+  bossSpawned = true;
+
+  setBossBar(kind);
+  bossBar.style.display = 'block';
+
+  SFX.boss();
+  BGM.setMode('boss');
+  popWord(kind === 'hands' ? '千手墨神' : '裂口巨兽', innerWidth/2, innerHeight*0.3,
+          kind === 'hands' ? '#00e5ff' : '#ff2e88', 58);
+  toast('小兵已被震散 · 单挑开始', '#ffe600');
+  shock(bx, bz, COS.mag, 13, 0.9);
+}
+
+function setBossBar(kind){
+  var name = kind === 'hands' ? '千手墨神' : '裂口巨兽';
+  var sub  = kind === 'hands' ? '第 10 波 · 八臂弹幕 · 会瞬移' : '第 5 波 · 巨颚冲锋 · 震地';
+  var col  = kind === 'hands' ? '#00e5ff' : '#ff2e88';
+  var grad = kind === 'hands'
+    ? 'linear-gradient(90deg,#141033,#00e5ff,#ffe600)'
+    : 'linear-gradient(90deg,#7b2ff7,#ff2e88,#ffe600)';
+  bossBar.innerHTML =
+    '<div style="font-family:var(--disp);font-size:14px;letter-spacing:.22em;' +
+      'color:' + col + ';text-align:center;text-shadow:2px 2px 0 #0a0a12">' + name + '</div>' +
+    '<div style="font-size:9px;letter-spacing:.12em;color:#cfd6e4;text-align:center;' +
+      'margin-bottom:3px;text-shadow:1px 1px 0 #0a0a12">' + sub + '</div>' +
+    '<div style="height:13px;background:rgba(10,10,18,.85);border:3px solid #0a0a12">' +
+      '<i id="bosshp" style="display:block;height:100%;width:100%;background:' + grad +
+      ';transition:width .1s"></i></div>';
+}
+
+
 function angLerp(a, b, t){
   var d = ((b - a + Math.PI) % TAU + TAU) % TAU - Math.PI;
   return a + d*t;
@@ -2841,59 +3559,179 @@ function updateBoss(dt){
   if(!boss) return;
   var b = boss;
   b.t += dt;
+
+  /* ── 出场：从地下升起来 ──
+     升的这 1.5 秒里既不动也不攻击，玩家有时间看清它长什么样。 */
+  if(b.rise > 0){
+    b.rise -= dt;
+    var k = 1 - Math.max(0, b.rise) / b.riseMax;
+    var e = k < 0.82 ? (k/0.82) : 1;
+    b.obj.position.set(b.x, lerp(b.baseY - 6, b.baseY, e), b.z);
+    b.obj.rotation.y = b.ang + (1 - e) * 5.5;
+    if(b.rise <= 0){
+      b.obj.position.y = b.baseY;
+      shake(1.0); flash(0.28);
+      shock(b.x, b.z, COS.yel, 15, 0.85);
+      burst(b.x, 0.6, b.z, COS.mag, 22, 11, 1.3);
+      SFX.boss();
+    }
+    return;
+  }
+
+  /* 血量过半进狂暴：招式更快，这是「有挑战感」的来源之一 */
+  if(!b.rage && b.hp < b.maxhp * 0.5){
+    b.rage = true;
+    flash(0.3); shake(0.7);
+    shock(b.x, b.z, COS.red, 9, 0.6);
+    toast(b.kind === 'hands' ? '千手墨神 · 狂怒' : '裂口巨兽 · 狂怒', '#ff2e88');
+    SFX.boss();
+  }
+  var rageK = b.rage ? 1.35 : 1;
+
+  if(b.kind === 'hands') updateHandsBoss(b, dt, rageK);
+  else updateMawBoss(b, dt, rageK);
+}
+
+/* ── 裂口巨兽：贴地追击 + 蓄力冲锋 + 震地环 ── */
+function updateMawBoss(b, dt, rageK){
   var dx = hero.x - b.x, dz = hero.z - b.z;
   var d = Math.hypot(dx, dz) || 1;
   b.ang = Math.atan2(dx, dz);
-
-  b.obj.position.set(b.x, 2.1 + Math.sin(b.t*2.2)*0.22, b.z);
   b.obj.rotation.y = b.ang;
-  b.obj.userData.halo.rotation.z += dt*2.2;
+  b.obj.position.set(b.x, b.baseY + Math.sin(b.t * 3.2) * 0.06, b.z);
 
-  b.cd -= dt; b.dashCd -= dt; b.spawnCd -= dt;
+  b.dashCd -= dt * rageK;
+  b.slamCd -= dt * rageK;
 
-  if(b.dash > 0){
-    b.dash -= dt;
-    b.x += b.dashDir.x * 24 * dt;
-    b.z += b.dashDir.z * 24 * dt;
+  if(b.state === 'windup'){
+    b.stateT -= dt;
+    var q = 1 - Math.max(0, b.stateT) / 0.62;
+    /* 蓄力时身体后坐、压扁，让玩家看得出「要冲了」 */
+    b.obj.scale.set(1 + q*0.14, 1 - q*0.16, 1 + q*0.22);
+    if(b.stateT <= 0){
+      b.state = 'dash'; b.stateT = 0.78;
+      b.dashDir = {x: dx/d, z: dz/d};
+      b.obj.scale.set(1, 1, 1);
+      SFX.boss(); shake(0.55);
+    }
+  } else if(b.state === 'dash'){
+    b.stateT -= dt;
+    b.x += b.dashDir.x * 36 * dt;
+    b.z += b.dashDir.z * 36 * dt;
+    burst(b.x - b.dashDir.x*1.6, 0.7, b.z - b.dashDir.z*1.6, COS.mag, 2, 5, 0.55);
+    if(b.stateT <= 0){ b.state = 'idle'; b.stateT = 0.75; }
   } else {
-    b.x += (dx/d) * 3.6 * dt;
-    b.z += (dz/d) * 3.6 * dt;
-    if(b.dashCd <= 0){
-      b.dashCd = 4.4; b.dash = 0.62;
-      b.dashDir = {x:dx/d, z:dz/d};
-      shock(b.x, b.z, COS.yel, 5, 0.4);
-      SFX.boss();
+    b.stateT -= dt;
+    b.x += (dx/d) * 3.4 * dt;
+    b.z += (dz/d) * 3.4 * dt;
+    if(b.dashCd <= 0 && d > 4.5){
+      b.dashCd = 4.6;
+      b.state = 'windup'; b.stateT = 0.62;
+      shock(b.x, b.z, COS.red, 3.4, 0.5);
     }
   }
 
-  var lim = ARENA_R - 3;
+  /* 震地：十八方向冲击弹，逼玩家离开近身 */
+  if(b.slamCd <= 0){
+    b.slamCd = 6.6;
+    for(var i=0;i<18;i++){
+      var a = i/18*TAU;
+      spawnEBullet(b.x, b.z, Math.cos(a)*12, Math.sin(a)*12, 18);
+    }
+    shock(b.x, b.z, COS.yel, 11, 0.7);
+    shake(1.0); SFX.boss();
+  }
+
+  /* 身体接触伤害 */
+  if(d < b.r + 0.7) hurtHero(b.dmg);
+
+  var lim = ARENA_R - 4;
   var dd = Math.hypot(b.x, b.z);
   if(dd > lim){ b.x = b.x/dd*lim; b.z = b.z/dd*lim; }
+}
 
-  // 环形弹幕
-  if(b.cd <= 0){
-    b.cd = 2.9;
-    var n = 12;
-    for(var i=0;i<n;i++){
-      var a = i/n*TAU + b.t;
-      spawnEBullet(b.x, b.z, Math.cos(a)*10, Math.sin(a)*10, 14);
+/* ── 千手墨神：悬浮保持距离 + 环形弹幕 + 追踪弹 + 瞬移 ── */
+function updateHandsBoss(b, dt, rageK){
+  var dx = hero.x - b.x, dz = hero.z - b.z;
+  var d = Math.hypot(dx, dz) || 1;
+  b.ang = Math.atan2(dx, dz);
+  b.obj.rotation.y = b.ang;
+  b.obj.position.set(b.x, b.baseY + Math.sin(b.t * 1.8) * 0.38, b.z);
+
+  /* 八臂摆动 */
+  var arms = b.obj.userData.arms;
+  if(arms){
+    for(var i2=0;i2<arms.length;i2++){
+      var ud = arms[i2].userData;
+      if(ud.baseAng === undefined) continue;   // 防御：没有基准角就不动，绝不算 NaN
+      /* 只叠加「绕 Y 轴的小幅摆动」和「上下起伏」，不改 Z 轴，
+         这样八条手臂始终平铺在水平面上，俯视一直是放射状。 */
+      arms[i2].rotation.y = ud.baseAng + Math.sin(b.t * 2.4 + ud.phase) * 0.18;
+      arms[i2].rotation.x = Math.sin(b.t * 3.1 + ud.phase) * 0.13;
     }
-    shock(b.x, b.z, COS.mag, 4.5, 0.4);
+  }
+  /* 双环反向转 */
+  if(b.obj.userData.ring1) b.obj.userData.ring1.rotation.z += dt * 1.6;
+  if(b.obj.userData.ring2) b.obj.userData.ring2.rotation.z -= dt * 2.4;
+  /* 瞳孔追玩家 */
+  if(b.obj.userData.pupil){
+    b.obj.userData.pupil.position.x = clamp(dx/d * 0.16, -0.2, 0.2);
+    b.obj.userData.pupil.position.z = 0.85;
+  }
+
+  b.cd -= dt * rageK;
+  b.orbCd -= dt * rageK;
+  b.tpCd -= dt;
+
+  /* 保持 9.5 单位距离：太近后退，太远靠近 */
+  var want = 9.5;
+  var mv = d < want - 2.2 ? -3.6 : (d > want + 2.2 ? 3.0 : 0);
+  b.x += (dx/d) * mv * dt;
+  b.z += (dz/d) * mv * dt;
+
+  /* 环形弹幕：十六发，带旋转偏移，两层交替 */
+  if(b.cd <= 0){
+    b.cd = 3.4;
+    var cnt = b.rage ? 22 : 16;
+    for(var i3=0;i3<cnt;i3++){
+      var a2 = i3/cnt*TAU + b.t * 0.55;
+      spawnEBullet(b.x, b.z, Math.cos(a2)*11, Math.sin(a2)*11, 15);
+    }
+    shock(b.x, b.z, COS.cyn, 4.8, 0.4);
     SFX.laser();
   }
-  // 召唤
-  if(b.spawnCd <= 0){
-    b.spawnCd = 6.4;
-    for(var s=0;s<4;s++){
-      var aa = Math.random()*TAU;
-      spawnEnemy(pick(['blob','spiker']), b.x + Math.cos(aa)*4, b.z + Math.sin(aa)*4, {hpMul:1.3});
+
+  /* 追踪弹：朝玩家 ±0.26 弧度三连 */
+  if(b.orbCd <= 0){
+    b.orbCd = 6.0;
+    var base = Math.atan2(dx, dz);
+    for(var k3=-1;k3<=1;k3++){
+      var a3 = base + k3 * 0.26;
+      spawnEBullet(b.x, b.z, Math.sin(a3)*14.5, Math.cos(a3)*14.5, 17);
     }
+    SFX.boss();
+  }
+
+  /* 瞬移：消失在青色粒子中，出现在玩家周身 8 单位处 */
+  if(b.tpCd <= 0){
+    b.tpCd = 7.5;
+    burst(b.x, 1.6, b.z, COS.cyn, 18, 9, 1.0);
+    var a4 = Math.random()*TAU;
+    b.x = clamp(hero.x + Math.cos(a4)*8.5, -ARENA_R+5, ARENA_R-5);
+    b.z = clamp(hero.z + Math.sin(a4)*8.5, -ARENA_R+5, ARENA_R-5);
+    burst(b.x, 1.6, b.z, COS.mag, 20, 10, 1.0);
+    shock(b.x, b.z, COS.cyn, 5, 0.5);
+    SFX.whooshDown();
   }
 
   if(d < b.r + 0.6) hurtHero(b.dmg);
+
+  var lim2 = ARENA_R - 4;
+  var dd2 = Math.hypot(b.x, b.z);
+  if(dd2 > lim2){ b.x = b.x/dd2*lim2; b.z = b.z/dd2*lim2; }
 }
 
-/* ═══════════ 子弹更新 ═══════════ */
+
 function bulletHit(b, listArr, isEnemyList){}
 
 function updateBulletArr(arr, dt){
@@ -3017,8 +3855,14 @@ function updateGems(dt){
       g.y = 0.45 + Math.sin(S.t*5 + g.x)*0.1;
     }
     if(dd < 1.0){
+      /* 经验球是自动飞过来的（拾取半径 4.6），玩家常常没意识到自己「捡了东西」，
+         所以大球吸收时给一个 +N 飘字，让「打怪 → 涨经验 → 升级」这条链看得见。 */
       gainXP(g.val);
       burst(g.x, 0.6, g.z, COS.cyn, 3, 4, 0.6);
+      if(g.val >= 4){
+        var gsp = toScreen(g.x, 1.3, g.z);
+        popDmg('+' + g.val, gsp.x, gsp.y, '#00e5ff');
+      }
       SFX.hit();
       gems.splice(i,1); continue;
     }
@@ -3114,23 +3958,36 @@ function renderSpikes(){
 var hudAcc = 0;
 
 function update(dt){
-  if(S.hitstop > 0){ S.hitstop -= dt; dt *= 0.22; }
+  /* ── 顿帧的正确做法：只冻结世界，不冻结玩家 ──
+     原来是 if(hitstop>0) dt *= 0.22，把整个 update 的时间都压扁了，
+     包括 updateHero。炸弹一爆玩家移动就顿一下，Lv5 连锁连爆时叠成明显卡顿
+     —— 就是玩家报的「震屏时脚被卡住」。
+     现在拆成两份时间：
+       dt      = 真实时间，玩家移动 / 开火 / 拾取都按它走，手感永远顺
+       worldDt = 被压缩的时间，只给敌人、敌人子弹、粒子用
+     顿帧的打击感来自「敌人凝固」，跟玩家的手没关系，这样两头都保住。 */
+  var worldDt = dt;
+  if(S.hitstop > 0){ S.hitstop -= dt; worldDt = dt * 0.18; }
 
   shadowIdx = 0;
   updateHero(dt);
   updateWeapons(dt);
-  updateEnemies(dt);
-  updateBoss(dt);
-  updateBulletArr(bullets, dt);
-  updateBulletArr(bulletsB, dt);
-  updateEBullets(dt);
-  updateSpikes(dt);
+  updateEnemies(worldDt);
+  updateBoss(worldDt);
+  updateBulletArr(bullets, worldDt);
+  updateBulletArr(bulletsB, worldDt);
+  updateEBullets(worldDt);
+  updateSpikes(worldDt);
   updateGems(dt);
-  updateChests(dt);
-  updateSpawn(dt);
+  updateChests(worldDt);
+  updateSpawn(worldDt);
 
-  S.waveT += dt;
-  if(S.waveT >= S.waveLen && S.wave < 10) nextWave();
+  /* BOSS 在场时波次计时暂停，否则第 5 波 34 秒一到就直接跳第 6 波，
+     BOSS 还在场上，两波叠在一起打。 */
+  if(!(boss && !boss.dead)){
+    S.waveT += dt;
+    if(S.waveT >= S.waveLen && S.wave < 10) nextWave();
+  }
 
   // 渲染同步
   renderEnemies();
@@ -3233,7 +4090,7 @@ function gameOver(win){
 
   $('scr-over').classList.remove('hide');
   $('hud').classList.add('hide');
-  BGM.setMode('calm');
+  BGM.setMode('menu');
 }
 
 function victory(){ gameOver(true); }
@@ -3253,10 +4110,12 @@ function toggleBag(){
 function togglePause(){
   if(S.mode === 'play'){
     S.mode = 'pause';
+    SFX.whooshDown();
     BGM.pause();
     $('scr-pause').classList.remove('hide');
   } else if(S.mode === 'pause'){
     S.mode = 'play';
+    SFX.whooshUp();
     BGM.resume();
     $('scr-pause').classList.add('hide');
   }
@@ -3344,6 +4203,188 @@ $('volsfx').oninput = function(){
   AUDIO.apply();
 };
 $('volsfx').onchange = function(){ SFX.shoot(); };
+/* ═══════════════ 图鉴 ═══════════════
+   三种视角：敌人 / 武器 / 被动。
+   数值全部现读 ETYPES / WDEF / PDEF / EVO，不抄一份常量 ——
+   否则改了平衡，图鉴还显示旧数字，这种「两处各写一遍」的坑踩过太多次。
+   只有「长什么样」「怎么打」这种描述性文字是手写的。 */
+
+var CODEX_LOOK = {
+  blob:    {tag:'近战 · 直冲', cols:['#7b2ff7','#ffffff','#ff2e88'],
+            look:'紫色小团，正面两只白眼仁，身后三条洋红触须',
+            note:'最基础的小怪，直线冲脸，用来堆密度'},
+  spiker:  {tag:'近战 · 高速', cols:['#00e5ff','#ffe600','#ff2e88'],
+            look:'青色八面体，插着五根黄刺，正面一道黑色横眼',
+            note:'速度最快，接触伤害高，优先清掉'},
+  chunk:   {tag:'肉盾 · 慢速', cols:['#ffe600','#7b2ff7','#ff3b30'],
+            look:'黄色大圆球，正面两颗红眼带黑瞳，下方黑裂口和三颗白牙，底部两颗蓝紫小球',
+            note:'血厚体积大，挡走位，别被它堵进角落'},
+  thrower: {tag:'远程 · 保持距离', cols:['#ff3b30','#ffe600','#ff2e88'],
+            look:'红色柱状身体，洋红尖帽，右手举一颗黄球',
+            note:'不贴脸，站在外围扔墨弹，绕圈就能躲'}
+};
+
+var CODEX_BOSS = [
+  { name:'裂口巨兽', wave:5, cols:['#3d1a5e','#c0164e','#ffe600'],
+    tag:'第 5 波 · 贴地',
+    look:'紫色圆饼，正面开一张红色大嘴，嘴沿一圈白牙，两侧一对黄眼',
+    moves:'蓄力冲锋（前摇会压扁身体）· 震地十八向冲击弹 · 接触撕咬',
+    note:'近身压制型，别站它正前方，绕侧后打' },
+  { name:'千手墨神', wave:10, cols:['#3b2a72','#00e5ff','#ffe600'],
+    tag:'第 10 波 · 悬浮',
+    look:'紫色形体，八条青色手臂放射平铺，末端黄色爪，正面一只竖眼',
+    moves:'十六向环形弹幕 · 三连追踪弹 · 瞬移重组',
+    note:'远程封锁型，靠弹幕缝隙走，别追它' }
+];
+
+var CODEX_WROLE = {
+  bow:      {role:'远程 · 散射', note:'扇形多发，人越多越强，最稳的起手'},
+  laser:    {role:'远程 · 穿透', note:'一条线打到底，怪物排队时伤害翻倍'},
+  scythe:   {role:'近身 · 环绕', note:'贴脸清场，不用瞄准，但必须敢往怪堆里站'},
+  bomb:     {role:'投掷 · 范围', note:'抛物线落点爆炸，成堆的怪一次清'},
+  shuriken: {role:'回旋 · 追踪', note:'会绕回来咬人，单点输出高'},
+  spike:    {role:'地面 · 陷阱', note:'铺在身后，边跑边铺，专门对付追兵'}
+};
+
+function codexBlob(cols){
+  return '<div class="cx-blob" style="background:' + cols[0] + '">' +
+    '<i style="width:42%;height:42%;left:10%;top:14%;background:' + cols[1] + '"></i>' +
+    '<i style="width:26%;height:26%;right:8%;bottom:12%;background:' + cols[2] + '"></i>' +
+  '</div>';
+}
+
+function codexCard(head, body){
+  return '<div class="cx-card">' + head + body + '</div>';
+}
+
+function buildCodexMonster(){
+  var html = '';
+  EKEYS.forEach(function(k){
+    var d = ETYPES[k], m = CODEX_LOOK[k] || {tag:'', cols:['#999','#ccc','#eee'], look:'', note:''};
+    var head =
+      '<div class="cx-head">' + codexBlob(m.cols) +
+        '<div><div class="cx-name">' + d.name + '</div>' +
+        '<span class="cx-tag">' + m.tag + '</span></div>' +
+      '</div>';
+    var body = '<div class="cx-look">' + m.look + '</div>' +
+      '<div class="cx-stats">' +
+        '<div class="cx-stat"><span>基础血量</span><b>' + d.hp + '</b></div>' +
+        '<div class="cx-stat"><span>移动速度</span><b>' + d.spd + '</b></div>' +
+        '<div class="cx-stat"><span>接触伤害</span><b>' + d.dmg + '</b></div>' +
+        '<div class="cx-stat"><span>经验值</span><b>' + d.xp + '</b></div>' +
+      '</div>' +
+      '<div class="cx-note">' + m.note + '</div>';
+    html += codexCard(head, body);
+  });
+
+  CODEX_BOSS.forEach(function(b){
+    var head =
+      '<div class="cx-head">' + codexBlob(b.cols) +
+        '<div><div class="cx-name">' + b.name + '</div>' +
+        '<span class="cx-tag">' + b.tag + '</span></div>' +
+      '</div>';
+    var hp = Math.round(EXPECTED_DPS[b.wave - 1] * (b.wave >= 10 ? 28 : 16));
+    var body = '<div class="cx-look">' + b.look + '</div>' +
+      '<div class="cx-stats">' +
+        '<div class="cx-stat"><span>血量</span><b>' + hp.toLocaleString() + '</b></div>' +
+        '<div class="cx-stat"><span>目标耗时</span><b>' + (b.wave >= 10 ? 28 : 16) + ' 秒</b></div>' +
+      '</div>' +
+      '<div class="cx-look" style="font-size:11.5px"><b>招式：</b>' + b.moves + '</div>' +
+      '<div class="cx-note">' + b.note + '</div>';
+    html += codexCard(head, body);
+  });
+  return html;
+}
+
+function buildCodexWeapon(){
+  var html = '';
+  WKEYS.forEach(function(id){
+    var d = WDEF[id], r = CODEX_WROLE[id] || {role:'', note:''};
+    var ev = EVO[id];
+    var head =
+      '<div class="cx-head">' + codexBlob([d.col, '#ffffff', '#0a0a12']) +
+        '<div><div class="cx-name">' + d.name + '</div>' +
+        '<span class="cx-tag">' + r.role + '</span></div>' +
+      '</div>';
+    var lvs = '';
+    d.lv.forEach(function(txt, idx){
+      lvs += '<span class="' + (idx === d.max - 1 ? 'hot' : '') + '">Lv' + (idx + 1) + ' ' + txt + '</span>';
+    });
+    var body = '<div class="cx-look">' + r.note + '</div>' +
+      '<div class="cx-lv">' + lvs + '</div>' +
+      '<div class="cx-stats">' +
+        '<div class="cx-stat"><span>单发伤害</span><b>' + d.dmg[0] + ' → ' + d.dmg[d.max - 1] + '</b></div>' +
+        '<div class="cx-stat"><span>冷却</span><b>' + d.cd[0] + ' → ' + d.cd[d.max - 1] + ' 秒</b></div>' +
+      '</div>' +
+      (ev ? '<div class="cx-evo">超武：' + ev.name + '　' + ev.gain + '</div>' : '');
+    html += codexCard(head, body);
+  });
+  return html;
+}
+
+function buildCodexPassive(){
+  var html = '';
+  PKEYS.forEach(function(id){
+    var d = PDEF[id];
+    var head =
+      '<div class="cx-head">' + codexBlob([d.col, '#ffffff', '#0a0a12']) +
+        '<div><div class="cx-name">' + d.name + '</div>' +
+        '<span class="cx-tag">被动 · 最多 ' + d.max + ' 级</span></div>' +
+      '</div>';
+    var body = '<div class="cx-look">' + d.txt(1) + '（每级）</div>' +
+      '<div class="cx-stats">' +
+        '<div class="cx-stat"><span>Lv1</span><b>' + d.txt(1) + '</b></div>' +
+        '<div class="cx-stat"><span>Lv' + d.max + '</span><b>' + d.txt(d.max) + '</b></div>' +
+      '</div>';
+    html += codexCard(head, body);
+  });
+  /* 超武单独成一组，玩家最需要知道「哪条流派对应哪个超武」 */
+  WKEYS.forEach(function(id){
+    var ev = EVO[id];
+    if(!ev) return;
+    var w = WDEF[id];
+    html += codexCard(
+      '<div class="cx-head">' + codexBlob([ev.col, '#ffffff', '#0a0a12']) +
+        '<div><div class="cx-name">' + ev.name + '</div>' +
+        '<span class="cx-tag">超武 · 整局只能选一个</span></div>' +
+      '</div>',
+      '<div class="cx-look">' + ev.desc + '</div>' +
+      '<div class="cx-evo">前置：' + w.name + ' 满级 + ' + PDEF[ev.req].name + ' 3 级</div>' +
+      '<div class="cx-note">' + ev.gain + '</div>'
+    );
+  });
+  return html;
+}
+
+var codexTab = 'monster';
+function renderCodex(){
+  var box = $('codexBody');
+  if(!box) return;
+  if(codexTab === 'weapon') box.innerHTML = buildCodexWeapon();
+  else if(codexTab === 'passive') box.innerHTML = buildCodexPassive();
+  else box.innerHTML = buildCodexMonster();
+}
+function openCodex(){
+  renderCodex();
+  $('scr-codex').classList.remove('hide');
+  SFX.chest();
+}
+function closeCodex(){
+  $('scr-codex').classList.add('hide');
+}
+if($('codexbtn')) $('codexbtn').onclick = openCodex;
+if($('codexclose')) $('codexclose').onclick = closeCodex;
+if($('codexTabs')){
+  $('codexTabs').onclick = function(e){
+    var b = e.target.closest('button');
+    if(!b) return;
+    codexTab = b.dataset.tab;
+    Array.prototype.forEach.call(this.children, function(x){ x.classList.toggle('on', x === b); });
+    renderCodex();
+    SFX.hit();
+  };
+}
+
 $('startbtn').onclick = startGame;
 $('bagbtn').onclick = function(){ toggleBag(); };
 $('bagclose').onclick = function(){ toggleBag(); };
