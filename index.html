@@ -327,6 +327,9 @@ body.is-title canvas#gl{
 .card.evoc{border-color:#7b2ff7;box-shadow:8px 8px 0 #7b2ff7,0 0 28px rgba(255,46,136,.55)}
 /* 新武器卡：用青色边框和标签跟「强化/被动」区分开，
    否则玩家在快节奏里分不出这张卡会往背包里加东西 */
+.card.archc{border-color:#0f9b6c;box-shadow:8px 8px 0 #0f9b6c}
+.card.archc .kd{color:#0b6b4a;font-weight:800}
+.card.archc .gain{color:#0f7a55}
 .card.newc{border-color:#00b8d4;box-shadow:8px 8px 0 #00b8d4,0 0 26px rgba(0,229,255,.32)}
 .card.newc .kd{color:#006d7d;font-weight:800}
 .card.newc .gain{color:#00808f}
@@ -462,6 +465,29 @@ body.is-title canvas#gl{
   box-shadow:4px 4px 0 rgba(10,10,18,.45)}
 
 /* 音频控件 */
+/* ── 超武蓄力环 ── */
+#ultbox{position:fixed;right:22px;bottom:60px;width:96px;height:96px;z-index:24;
+  pointer-events:auto;cursor:pointer;transition:opacity .25s, transform .12s}
+#ultbox.off{opacity:0;pointer-events:none}
+#ultbox:active{transform:scale(.95)}
+#ultbox svg{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg)}
+#ultbox .ubg{fill:none;stroke:rgba(10,10,18,.55);stroke-width:11}
+#ultbox .ufg{fill:none;stroke:#ffe600;stroke-width:9;stroke-linecap:round;
+  stroke-dasharray:257.6;stroke-dashoffset:257.6;transition:stroke-dashoffset .06s linear}
+#ultbox .ucore{position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:1px;pointer-events:none}
+#ultbox .ucore b{font-family:var(--disp);font-size:13px;letter-spacing:.06em;color:#fff6e9;
+  text-shadow:2px 2px 0 #0a0a12;line-height:1;max-width:78px;text-align:center}
+#ultbox .ucore s{text-decoration:none;font-size:9px;letter-spacing:.12em;color:#cfd6e4;
+  text-shadow:1px 1px 0 #0a0a12}
+#ultbox.ready .ufg{stroke:#ffe600;animation:ultGlow 1.1s ease-in-out infinite}
+#ultbox.ready .ucore b{color:#ffe600}
+#ultbox.ready .ucore s{color:#ffe600}
+@keyframes ultGlow{
+  0%,100%{filter:drop-shadow(0 0 3px rgba(255,230,0,.55))}
+  50%{filter:drop-shadow(0 0 12px rgba(255,230,0,.95))}
+}
+
 #audiobox{position:fixed;left:12px;top:72px;z-index:28;display:flex;flex-direction:column;
   align-items:flex-start;gap:5px}
 #mutebtn{width:46px;height:46px;border-radius:9px;border:3px solid var(--ink);
@@ -542,6 +568,11 @@ body.is-title canvas#gl{
   .startbig{font-size:20px; padding:8px 40px; margin-top:7px;
     border-width:4px; box-shadow:5px 5px 0 var(--ink)}
   #scr-title .startbig{animation:none}
+
+  /* ── 超武蓄力环：缩小并挪进右下角 ── */
+  #ultbox{width:70px;height:70px;right:12px;bottom:24px}
+  #ultbox .ucore b{font-size:10px;max-width:56px}
+  #ultbox .ucore s{font-size:8px}
 
   /* ── 音频控件：矮屏只留静音图标，音量面板收进暂停菜单 ── */
   #audiobox{left:auto; right:10px; top:8px; flex-direction:row; gap:5px}
@@ -882,6 +913,18 @@ body.is-title canvas#gl{
   </div>
   <div class="slots" id="slots"></div>
   <button id="bagbtn">背包 / TAB</button>
+
+  <!-- 超武蓄力环：桌面按空格释放，手机点它也能放 -->
+  <div id="ultbox" class="off">
+    <svg viewBox="0 0 100 100" aria-hidden="true">
+      <circle class="ubg" cx="50" cy="50" r="41"></circle>
+      <circle class="ufg" id="ultring" cx="50" cy="50" r="41"></circle>
+    </svg>
+    <div class="ucore">
+      <b id="ulticon">超武</b>
+      <s id="ultkey">空格</s>
+    </div>
+  </div>
   <div class="xpwrap">
     <div class="xpbar"><i id="xpfill"></i><span id="xptxt">XP</span></div>
   </div>
@@ -1262,21 +1305,29 @@ function updateCamera(dt, px, pz){
     camZ = 16.5 * (0.78 + 0.22*k);
   }
 
-  // 震屏
+  /* ── 震屏：trauma 模型（GDC《Juicing Your Cameras With Math》）──
+     trauma 是 0~1 的「震动总量」，事件往上加、封顶 1，然后线性衰减；
+     实际位移 = trauma²（平方让小震动更轻、大震动更猛，手感才有层次）。
+     为什么不能像原来那样用 max：4 颗炸弹错时爆炸，每次都会把震动顶回满值，
+     于是 4 次独立抽动 —— 玩家描述成「屏幕被拉扯」。累加后 4 颗炸弹合成
+     一次持续约 0.7 秒的强震，包络是连续的。 */
   var sx = 0, sy = 0, sz = 0;
   if(camShake > 0.001){
-    camShakeT += dt*38;
-    sx = Math.cos(camShakeT*1.7)*camShake;
-    sy = Math.sin(camShakeT*2.3)*camShake*0.6;
-    sz = Math.cos(camShakeT*2.9)*camShake;
-    camShake *= Math.pow(0.0025, dt);
-    if(camShake < 0.02) camShake = 0;
+    camShakeT += dt*34;
+    var k = camShake * camShake;
+    sx = Math.cos(camShakeT*1.7) * k * 1.25;
+    sy = Math.sin(camShakeT*2.3) * k * 0.55;
+    sz = Math.cos(camShakeT*2.9) * k * 1.0;
+    camShake -= 1.35 * dt;          // 线性衰减：满值约 0.74 秒回到 0
+    if(camShake < 0) camShake = 0;
   }
 
   camera.position.set(px + sx, camH + sy, pz + camZ + sz);
   camera.lookAt(px + sx*0.5, 0.6, pz - 4);
 }
-function shake(amt){ camShake = Math.max(camShake, amt); }
+/* 累加而不是取最大值：连炸才会合成一次长震，而不是反复抽动。
+   1.0 封顶，防止十几个事件叠成癫痫。 */
+function shake(amt){ camShake = Math.min(1, camShake + amt); }
 
 /* ─────────── 屏幕特效 ─────────── */
 var flashEl = $('flash'), speedEl = $('speedlines'), tintEl = $('damagetint'), fxEl = $('fx');
@@ -1376,6 +1427,9 @@ function noise(dur, vol, hp){
 var SFX = {
   shoot: function(){ tone(rnd(680,760), 0.07, 'square', 0.10, 320); },
   laser: function(){ tone(1400, 0.10, 'sawtooth', 0.10, 420); },
+  /* 敌人开火：低频、闷、短。和玩家那声高频「咔」明显不同，
+     否则满屏时根本分不清「是我在打还是我在挨打」。 */
+  eshoot: function(){ tone(190, 0.15, 'square', 0.085, 96); noise(0.07, 0.06, 260); },
   hit:   function(){ noise(0.055, 0.14, 1400); },
   crit:  function(){ noise(0.09, 0.20, 900); tone(880,0.1,'square',0.14,1600); },
   kill:  function(){ noise(0.13, 0.16, 500); tone(rnd(180,240),0.12,'triangle',0.12,90); },
@@ -1863,8 +1917,13 @@ var BGM = (function(){
       if(mode === m) return;
       mode = m;
       step = 0;
+      /* 必须先判 AC 再碰它。
+         原来这行写在判空之前：如果玩家从没触发过音频初始化
+         （浏览器拦截自动播放、或自动化测试里），结算时调用 setMode
+         就会抛 "Cannot read properties of null (reading 'currentTime')"，
+         直接把 gameOver 打断，结算界面出不来。 */
+      if(!AC || !playing || !g) return;
       nextTime = AC.currentTime + 0.1;
-      if(!playing || !g || !AC) return;
       var target = (muted || paused) ? 0.0001 : vol;
       /* 起播后 0.35 秒内就换曲，说明压根没有「上一首」可淡出。
          这时候做 0.09 秒压下 + 0.62 秒抬起，只是把刚出来的声音又抹掉。
@@ -2270,6 +2329,16 @@ EKEYS.forEach(function(k){
   };
 });
 
+/* 投掷手脚下的预警圈：随蓄力从大收到小，收满就开火 */
+var warnGeo = new THREE.RingGeometry(0.80, 1, 22);
+warnGeo.rotateX(-Math.PI/2);
+var warnPool = instPool(warnGeo, new THREE.MeshBasicMaterial({
+  color:0xff2e88, transparent:true, opacity:0.92,
+  side:THREE.DoubleSide, depthWrite:false
+}), 40);
+warnPool.renderOrder = 4;
+var warnIdx = 0;
+
 var eliteRingGeo = new THREE.RingGeometry(0.62, 0.88, 24);
 eliteRingGeo.rotateX(-Math.PI/2);
 var eliteRing = instPool(eliteRingGeo, new THREE.MeshBasicMaterial({
@@ -2315,7 +2384,7 @@ function spawnEnemy(type, x, z, opts){
     hp:d.hp*hpMul, maxhp:d.hp*hpMul,
     spd:d.spd*(1 + (S.wave-1)*0.028)*(elite?0.86:1),
     r:d.r*(elite?1.32:1), dmg:d.dmg*dmgMul, xp:d.xp*(elite?6:1),
-    ang:0, hit:0, cd:rnd(0.6,2.4), phase:Math.random()*TAU,
+    ang:0, hit:0, cd:rnd(0.6,2.4), phase:Math.random()*TAU, wind:0, windMax:0.45,
     dead:false, boss:false, elite:elite, offs:rnd(-0.55,0.55)
   };
   list.push(e);
@@ -2332,6 +2401,7 @@ function forEachEnemy(fn){
 var eliteRingIdx = 0;
 function renderEnemies(){
   eliteRingIdx = 0;
+  warnIdx = 0;
   for(var k=0;k<4;k++){
     var key = EKEYS[k], list = E[key], m = eMesh[key], d = ETYPES[key];
     var n = 0;
@@ -2346,6 +2416,15 @@ function renderEnemies(){
         _dm.scale.setScalar(e.r * 2.7);
         _dm.updateMatrix();
         eliteRing.setMatrixAt(eliteRingIdx++, _dm.matrix);
+      }
+      /* 投掷手蓄力：地面圈从 2.8 收到 1.1，越接近开火越小 */
+      if(e.wind > 0 && warnIdx < 40){
+        var wp = 1 - e.wind / (e.windMax || 0.45);
+        _dm.position.set(e.x, 0.08, e.z);
+        _dm.rotation.set(0, 0, 0);
+        _dm.scale.setScalar(2.8 - wp * 1.7);
+        _dm.updateMatrix();
+        warnPool.setMatrixAt(warnIdx++, _dm.matrix);
       }
       _dm.position.set(e.x, e.y + bob, e.z);
       _dm.rotation.set(0, e.ang, 0);
@@ -2369,6 +2448,8 @@ function renderEnemies(){
   }
   eliteRing.count = eliteRingIdx;
   eliteRing.instanceMatrix.needsUpdate = true;
+  warnPool.count = warnIdx;
+  warnPool.instanceMatrix.needsUpdate = true;
 }
 
 /* ═══════════ BOSS ═══════════ */
@@ -2557,6 +2638,13 @@ function buildBoss(x, z, hp, kind){
 
   g.scale.setScalar(1.15);
   g.position.set(x, baseY - 6, z);
+
+  /* 阶段护盾挂在 BOSS 身上，默认隐藏；无敌期间才亮 */
+  var shield = makeBossShield(kind === 'hands' ? 3.0 : 3.4,
+                              kind === 'hands' ? 0x00e5ff : 0xff2e88);
+  shield.position.y = 0.4;
+  g.add(shield);
+
   scene.add(g);
 
   return {
@@ -2570,8 +2658,22 @@ function buildBoss(x, z, hp, kind){
     state: 'idle', stateT: 0,
     cd: 2.2, dashCd: 3.4, slamCd: 5.5, tpCd: 5.0, orbCd: 3.6,
     dashDir: {x:0, z:1},
-    rage: false
+    rage: false, phase2: false, phase3: false, invulnT: 0, shield: shield,
+    dmgTaken: 0, calibT: 0, calibrated: false, dmgWindow: 25
   };
+}
+
+/* 阶段护盾：线框球，只在无敌期间出现。
+   没有它的话「打不动」会被读成 bug；有了它就是明确的「先破壳」信号。 */
+function makeBossShield(r, col){
+  var m = new THREE.Mesh(
+    new THREE.SphereGeometry(r, 14, 10),
+    new THREE.MeshBasicMaterial({color: col, wireframe:true, transparent:true,
+                                 opacity:0.3, depthWrite:false})
+  );
+  m.visible = false;
+  m.renderOrder = 5;
+  return m;
 }
 
 function killBoss(){
@@ -2591,10 +2693,27 @@ function killBoss(){
 /* ═══════════ 子弹 ═══════════ */
 var bulA = instPool(new THREE.BoxGeometry(0.17, 0.17, 1),
   new THREE.MeshBasicMaterial({color:0x9ff6ff}), 300);
+/* 玩家弹走冷色（青白 / 青绿），把洋红整条让给「敌方威胁」。
+   这样一眼就能判断「这一片是我打的还是冲我来的」。 */
 var bulB = instPool(new THREE.OctahedronGeometry(0.24, 0),
-  new THREE.MeshBasicMaterial({color:COS.mag}), 240);
-var bulC = instPool(new THREE.OctahedronGeometry(0.26, 0),
-  new THREE.MeshBasicMaterial({color:COS.yel}), 200);   // 敌方弹
+  new THREE.MeshBasicMaterial({color:0x2ee6c0}), 240);
+/* ── 敌方弹幕：四层结构，专门为「看得见」设计 ──
+   ① 黑壳（BackSide，放大 1.5）：任何亮背景上都有墨线轮廓，灰阶也成立
+   ② 洋红本体：危险色独占色相，不再和金色经验球、金色爆炸撞车
+   ③ 粉白内核：命中前一瞬间最亮的参照点
+   ④ 两段拖尾：能看出「从哪来、往哪去」
+   全部关掉 depthTest 并提高 renderOrder —— 弹幕永远画在粒子、爆炸、角色之上，
+   这是弹幕游戏的通则（Boghog《Bullet Hell Shmup 101》）。 */
+var eBulShell = instPool(new THREE.OctahedronGeometry(0.30, 0),
+  new THREE.MeshBasicMaterial({color:0x0a0a12, side:THREE.BackSide, depthTest:false, depthWrite:false}), 200);
+var eBulBody = instPool(new THREE.OctahedronGeometry(0.30, 0),
+  new THREE.MeshBasicMaterial({color:0xff2e88, depthTest:false, depthWrite:false}), 200);
+var eBulCore = instPool(new THREE.OctahedronGeometry(0.12, 0),
+  new THREE.MeshBasicMaterial({color:0xffe0ec, depthTest:false, depthWrite:false}), 200);
+var eBulTrail = instPool(new THREE.OctahedronGeometry(0.21, 0),
+  new THREE.MeshBasicMaterial({color:0xff2e88, transparent:true, opacity:0.34,
+                               depthTest:false, depthWrite:false}), 400);
+[eBulShell, eBulBody, eBulCore, eBulTrail].forEach(function(m){ m.renderOrder = 8; });
 var bullets = [], bulletsB = [], eBullets = [];
 
 function spawnBullet(o){
@@ -2609,7 +2728,9 @@ function spawnBullet(o){
   return b;
 }
 function spawnEBullet(x, z, vx, vz, dmg){
-  eBullets.push({x:x, y:1.0, z:z, vx:vx, vz:vz, dmg:dmg, life:3.4, r:0.4, phase:Math.random()*TAU});
+  eBullets.push({x:x, y:1.0, z:z, vx:vx, vz:vz, dmg:dmg, life:3.4, r:0.4,
+                 phase:Math.random()*TAU, born:0,
+                 sp: Math.hypot(vx, vz) || 1});
 }
 
 /* ═══════════ 经验宝石 ═══════════ */
@@ -2661,87 +2782,339 @@ function clearChest(c){
 /* ═══════════ 武器定义 ═══════════ */
 var WDEF = {
   bow:{
-    name:'爆裂弓', short:'弓', col:'#00e5ff', max:5,
+    name:'爆裂弓', short:'弓', col:'#00e5ff', max:5, arch:'shot',
     cd:[0.60,0.53,0.47,0.43,0.38], dmg:[9,10,11,13,15],
-    cnt:[1,2,3,3,5], coef:0.8, cntEvo:12, coefEvo:0.9,
+    cnt:[1,2,3,3,5], coef:0.8, cntEvo:12, coefEvo:0.9, sHit:0.85, sHitEvo:0.22,
     lv:['单发快箭','双发连射','三向散射','三向 + 穿透','五向 + 穿透'],
     desc:'起手武器。箭数随等级增加，四级起箭头可穿透敌人。'
   },
   laser:{
-    name:'穿透激光', short:'激光', col:'#ffe600', max:5,
+    name:'穿透激光', short:'激光', col:'#ffe600', max:5, arch:'shot',
     cd:[0.90,0.82,0.74,0.66,0.58], dmg:[14,17,20,24,28],
-    cnt:[1,1,2,2,3], coef:1.0, cntEvo:4, coefEvo:1.0,
+    cnt:[1,1,2,2,3], coef:1.0, cntEvo:4, coefEvo:1.0, sHit:1.0, sHitEvo:1.0,
     lv:['单束贯通','增强贯通','双束交叉','双束 + 强化','三束 + 灼烧'],
     desc:'指哪打哪的直线激光，无视一切阻挡。等级越高束数越多。'
   },
   scythe:{
-    name:'环绕镰', short:'镰刀', col:'#b6ff3c', max:5,
+    name:'环绕镰', short:'镰刀', col:'#b6ff3c', max:5, arch:'melee',
     cd:[0.56,0.52,0.48,0.44,0.40], dmg:[14,17,20,23,26],
-    cnt:[1,1,1,1,1], coef:2.6, cntEvo:1, coefEvo:4.2,
+    cnt:[1,1,1,1,1], coef:2.6, cntEvo:1, coefEvo:4.2, sHit:0.70, sHitEvo:0.70,
     lv:['单刃环绕','双刃环绕','双刃提速','三刃环绕','四刃风暴'],
     desc:'刀刃绕身旋转，不占用射击节奏。贴脸即绞杀，最稳的近身流派。'
   },
   bomb:{
-    name:'抛掷炸弹', short:'炸弹', col:'#ff3b30', max:5,
+    name:'抛掷炸弹', short:'炸弹', col:'#ff3b30', max:5, arch:'throw',
     cd:[1.55,1.40,1.28,1.16,1.02], dmg:[16,19,23,27,32],
-    cnt:[1,2,2,3,4], coef:1.2, cntEvo:6, coefEvo:1.6,
+    cnt:[1,2,2,3,4], coef:1.2, cntEvo:6, coefEvo:1.6, sHit:1.0, sHitEvo:1.0,
     lv:['单颗抛掷','双颗抛掷','双颗 + 爆域','三颗 + 爆域','四颗 + 连锁'],
     desc:'抛出去落地炸开，范围伤害。怪越密收益越高，清屏主力。'
   },
   shuriken:{
-    name:'回旋镖', short:'飞镖', col:'#ff2e88', max:5,
+    name:'回旋镖', short:'飞镖', col:'#2ee6c0', max:5, arch:'throw',
     cd:[0.85,0.78,0.68,0.56,0.46], dmg:[11,13,16,20,24],
-    cnt:[1,1,2,3,4], coef:0.65, cntEvo:4, coefEvo:1.2,
+    cnt:[1,1,2,3,4], coef:0.65, cntEvo:4, coefEvo:1.2, sHit:0.75, sHitEvo:0.35,
     lv:['单枚回旋','双枚回旋','双枚 + 加速','三枚回旋','四枚 + 追踪'],
     desc:'飞出去再飞回来，同一发能打两次。五级带自动追踪。'
   },
   spike:{
-    name:'地刺', short:'地刺', color:'#7b2ff7', col:'#7b2ff7', max:5,
+    name:'地刺', short:'地刺', color:'#7b2ff7', col:'#7b2ff7', max:5, arch:'melee',
     cd:[1.30,1.18,1.06,0.94,0.82], dmg:[9,12,15,19,24],
-    cnt:[1,1,1,1,1], coef:4.6, cntEvo:1, coefEvo:7.0,
+    cnt:[1,1,1,1,1], coef:4.6, cntEvo:1, coefEvo:7.0, sHit:0.50, sHitEvo:0.50,
     lv:['一片地刺','两片地刺','两片 + 减速','三片地刺','四片雷区'],
     desc:'沿走位方向留下尖刺，敌人踩上去持续掉血。边跑边下套。'
   }
 };
 var WKEYS = ['bow','laser','scythe','bomb','shuriken','spike'];
 
-var PDEF = {
-  atk:   {name:'攻击强化', short:'攻击', col:'#ff2e88', max:5, txt:function(l){ return '所有伤害 +'+Math.round(l*14)+'%'; }},
-  aspd:  {name:'攻速狂热', short:'攻速', col:'#ffe600', max:5, txt:function(l){ return '全部武器冷却 -'+Math.round((1-1/(1+l*0.12))*100)+'%'; }},
-  move:  {name:'疾风之靴', short:'移速', col:'#00e5ff', max:5, txt:function(l){ return '移动速度 +'+Math.round(l*6)+'%'; }},
-  hp:    {name:'铁壁之心', short:'生命',  col:'#ff3b30', max:5, txt:function(l){ return '生命上限 +'+l*18; }},
-  magnet:{name:'磁力场',   short:'拾取', col:'#b6ff3c', max:5, txt:function(l){ return '经验拾取范围 +'+Math.round(l*30)+'%'; }},
-  crit:  {name:'致命一击', short:'暴击', col:'#7b2ff7', max:5, txt:function(l){ return '暴击率 +'+Math.round(l*7)+'%，暴击伤害 x2.0'; }}
+/* ═══════════ 三条流派 ═══════════
+   每把武器只属于一条线。流派精通只加成自己那条线，
+   所以「什么都点一点」会摊薄，必须选路线。
+   同一条线带满 2 把武器 → 套装加成 ×1.30，用来补偿「只有两把武器」的劣势。
+
+   参考 Brotato：四种伤害属性按武器类别分离，混点等于两套都半吊子；
+   同职业套装给额外回报。这里把「职业」简化成三条线。 */
+var ARCH = {
+  melee: {name:'贴身', col:'#b6ff3c', sub:'绕身绞杀 · 越贴越强'},
+  throw: {name:'投掷', col:'#2ee6c0', sub:'抛出去再回来 · 算提前量'},
+  shot:  {name:'射击', col:'#00e5ff', sub:'站定输出 · 一条线打穿'}
 };
-var PKEYS = ['atk','aspd','move','hp','magnet','crit'];
+var ARCH_KEYS = ['melee', 'throw', 'shot'];
+var SET_BONUS = 1.30;      // 同流派双持
+var ARCH_DMG = 0.20;       // 每级流派精通加的伤害
+
+var PDEF = {
+  melee: {name:'贴身精通', short:'贴身', col:'#b6ff3c', max:5, arch:'melee',
+          txt:function(l){ return '镰刀/地刺 伤害 +'+Math.round(l*100*ARCH_DMG)+'%，范围 +'+Math.round(l*6)+'%'; }},
+  throw: {name:'投掷精通', short:'投掷', col:'#2ee6c0', max:5, arch:'throw',
+          txt:function(l){ return '炸弹/飞镖 伤害 +'+Math.round(l*100*ARCH_DMG)+'%，暴击 +'+Math.round(l*4)+'%'; }},
+  shot:  {name:'射击精通', short:'射击', col:'#00e5ff', max:5, arch:'shot',
+          txt:function(l){ return '弓箭/激光 伤害 +'+Math.round(l*100*ARCH_DMG)+'%，攻速 +'+Math.round(l*5)+'%'; }},
+  move:  {name:'疾风之靴', short:'移速', col:'#ffc233', max:5,
+          txt:function(l){ return '移动速度 +'+Math.round(l*6)+'%'; }},
+  hp:    {name:'铁壁之心', short:'生命', col:'#ff3b30', max:5,
+          txt:function(l){ return '生命上限 +'+l*18; }},
+  magnet:{name:'磁力场',   short:'拾取', col:'#b07bff', max:5,
+          txt:function(l){ return '经验拾取范围 +'+Math.round(l*30)+'%'; }}
+};
+var PKEYS = ['melee', 'throw', 'shot', 'move', 'hp', 'magnet'];
 
 /* ═══════════ 超武进化 ═══════════
    武器满级 + 指定被动 ≥3 级 → 进化。用来解决「满级之后无事可做」。 */
 var EVO = {
-  bow:      {req:'aspd',   name:'箭雨',     col:'#00e5ff', gain:'12 发扇形，全穿透', desc:'一次射出十二支箭，铺满整个扇面'},
-  laser:    {req:'atk',    name:'湮灭射线', col:'#ffe600', gain:'4 束激光，持续 1.35 秒', desc:'四束激光同时贯穿，持续灼烧'},
-  scythe:   {req:'move',   name:'血月斩',   col:'#b6ff3c', gain:'6 刃，范围 +60%，吸血', desc:'六把镰刀环绕，命中回复生命'},
-  bomb:     {req:'crit',   name:'陨石雨',   col:'#ff3b30', gain:'6 颗，爆炸半径 +50%', desc:'六颗炸弹覆盖全场'},
-  shuriken: {req:'magnet', name:'无限回旋', col:'#ff2e88', gain:'4 枚，穿透并追踪', desc:'飞镖绕身盘旋三秒，自动咬住目标'},
-  spike:    {req:'hp',     name:'荆棘领域', col:'#7b2ff7', gain:'5 片，毒池扩大 50%', desc:'脚下铺满尖刺毒池，走过寸草不生'}
+  bow:      {req:'shot',  name:'箭雨',     col:'#00e5ff', ult:'暴雨模式',   gain:'12 发扇形，全穿透', desc:'一次射出十二支箭，铺满整个扇面'},
+  laser:    {req:'shot',  name:'湮灭射线', col:'#ffe600', ult:'过载贯穿',   gain:'4 束激光，持续 1.35 秒', desc:'四束激光同时贯穿，持续灼烧'},
+  scythe:   {req:'melee', name:'血月斩',   col:'#b6ff3c', ult:'血月',       gain:'6 刃，范围 +60%，吸血', desc:'六把镰刀环绕，命中回复生命'},
+  bomb:     {req:'throw', name:'陨石雨',   col:'#ff3b30', ult:'空袭',       gain:'6 颗，爆炸半径 +50%', desc:'六颗炸弹覆盖全场'},
+  shuriken: {req:'throw', name:'无限回旋', col:'#2ee6c0', ult:'超旋',       gain:'4 枚，穿透并追踪', desc:'飞镖绕身盘旋三秒，自动咬住目标'},
+  spike:    {req:'melee', name:'荆棘领域', col:'#7b2ff7', ult:'荆棘爆发',   gain:'5 片，毒池扩大 50%', desc:'脚下铺满尖刺毒池，走过寸草不生'}
 };
+
+/* ═══════════ 超武必杀 ═══════════
+   进化的意义不只是「数值变大」，而是多一个可以等、可以放的节奏点。
+   每个超武一个周期性必杀：蓄满 → 空格 → 一次明显的形态变化。
+   时长/伤害按「等效 DPS ≈ 常态 DPS × 2.2 秒 / 周期」推，六个大致齐平。 */
+var ULT = {
+  laser:    {name:'过载贯穿', cd:6.5, dur:0.55, col:'#ffe600', tip:'粗光束'},
+  bow:      {name:'暴雨模式', cd:7.0, dur:1.80, col:'#00e5ff', tip:'连射'},
+  bomb:     {name:'空袭',     cd:7.0, dur:1.00, col:'#ff3b30', tip:'地毯轰炸'},
+  shuriken: {name:'超旋',     cd:5.5, dur:1.50, col:'#2ee6c0', tip:'范围翻倍'},
+  scythe:   {name:'血月',     cd:6.0, dur:1.10, col:'#b6ff3c', tip:'聚怪斩杀'},
+  spike:    {name:'荆棘爆发', cd:5.0, dur:0.70, col:'#7b2ff7', tip:'环形地刺'}
+};
+
+/* 空袭 / 血月的延时结算队列 */
+var ultQueue = [];
+
+/* 蓄力光束的实体（复用同一份 mesh，避免每次造几何） */
+var ultBeam = new THREE.Mesh(
+  new THREE.BoxGeometry(1, 0.1, 1),
+  new THREE.MeshBasicMaterial({color:0xffffff, transparent:true, opacity:0.95})
+);
+ultBeam.visible = false; ultBeam.frustumCulled = false;
+scene.add(ultBeam);
+var ultBeamCore = new THREE.Mesh(
+  new THREE.BoxGeometry(1, 0.14, 1),
+  new THREE.MeshBasicMaterial({color:0xfff6e9, transparent:true, opacity:1})
+);
+ultBeamCore.visible = false; ultBeamCore.frustumCulled = false;
+scene.add(ultBeamCore);
+
+/* 血月的聚怪环 */
+var ultRingFx = new THREE.Mesh(
+  new THREE.RingGeometry(0.9, 1, 48),
+  new THREE.MeshBasicMaterial({color:0xb6ff3c, transparent:true, opacity:0.8,
+                               side:THREE.DoubleSide, depthWrite:false})
+);
+ultRingFx.rotation.x = -Math.PI/2;
+ultRingFx.visible = false; ultRingFx.frustumCulled = false;
+scene.add(ultRingFx);
+
+function ultReady(){ return !!(hero.evoId && hero.ult && hero.ult.charge >= 1); }
+
+var _ultUiLast = -1, _ultUiReady = null;
+function updateUltUI(force){
+  var box = $('ultbox');
+  if(!box) return;
+  if(!hero.evoId){ box.classList.add('off'); return; }
+  box.classList.remove('off');
+  var u = ULT[hero.evoId];
+  /* 只在变化超过 2% 或「满/未满」切换时写 DOM。
+     每帧无脑写 style/textContent 会强制样式重算，软渲染下能掉一半帧。 */
+  var ready = hero.ult.charge >= 1;
+  if(!force && Math.abs(hero.ult.charge - _ultUiLast) < 0.02 && ready === _ultUiReady) return;
+  _ultUiLast = hero.ult.charge; _ultUiReady = ready;
+  var ring = $('ultring');
+  var C = 257.6;
+  ring.style.strokeDashoffset = (C * (1 - clamp(hero.ult.charge, 0, 1))).toFixed(1);
+  ring.style.stroke = u.col;
+  $('ulticon').textContent = u.name;
+  $('ultkey').textContent = hero.ult.charge >= 1 ? '空格 释放' : Math.round(hero.ult.charge*100) + '%';
+  box.classList.toggle('ready', hero.ult.charge >= 1);
+}
+
+/* 沿一条射线结算：宽度 halfW，射程 60 */
+function damageBeam(x, z, ang, halfW, dmg){
+  var dx = Math.sin(ang), dz = Math.cos(ang);
+  function hit(e){
+    var rx = e.x - x, rz = e.z - z;
+    var along = rx*dx + rz*dz;
+    if(along < 0 || along > 60) return;
+    var perp = Math.abs(rx*dz - rz*dx);
+    if(perp <= halfW + e.r) hurtEnemy(e, dmg, false);
+  }
+  forEachEnemy(hit);
+  if(boss && !boss.dead) hit(boss);
+}
+
+function triggerUlt(){
+  if(S.mode !== 'play') return;
+  if(!hero.evoId){ toast('先拿到超武才能蓄力', '#ff2e88'); return; }
+  if(hero.ult.charge < 1){
+    toast('蓄力 ' + Math.round(hero.ult.charge*100) + '%', '#cfd6e4');
+    return;
+  }
+  var id = hero.evoId, u = ULT[id];
+  hero.ult.charge = 0;
+  hero.ult.active = u.dur;
+  var a = hero.ang || 0;
+  var tgt = nearestEnemy(hero.x, hero.z, 30);
+  if(tgt) a = Math.atan2(tgt.x - hero.x, tgt.z - hero.z);
+
+  var base = WDEF[id].dmg[4] * hero.stat.arch[WDEF[id].arch];
+
+  if(id === 'laser'){
+    /* 过载贯穿：一条 4 倍宽的贯穿光柱，0.55 秒内每 0.1 秒结算一次 */
+    hero.ult.ang = a;
+    hero.ult.beamTick = 0;
+    ultBeam.visible = true; ultBeamCore.visible = true;
+    ultBeam.material.color.set(u.col);
+    flash(0.18); speedLines(0.5, 160); shake(0.35);
+    SFX.laser(); SFX.boss();
+
+  } else if(id === 'bow'){
+    /* 暴雨模式：1.8 秒内攻速 ×2.6、弹数 +2，由 updateWeapons/fireWeapon 读取 */
+    shock(hero.x, hero.z, u.col, 7, 0.6);
+    flash(0.12); speedLines(0.6, 200);
+    SFX.whooshUp ? SFX.whooshUp() : SFX.chest();
+
+  } else if(id === 'bomb'){
+    /* 空袭：12 颗小炸弹预告 0.45 秒后落下，命中 8 次追加一颗大的 */
+    for(var i=0;i<12;i++){
+      var aa = Math.random()*TAU, rr = Math.sqrt(Math.random())*7;
+      ultQueue.push({type:'air', x: hero.x + Math.cos(aa)*rr, z: hero.z + Math.sin(aa)*rr,
+                     t: 0.45 + Math.random()*0.12, dmg: base*0.8, r: 1.9, big: false,
+                     mark: 0, col: u.col});
+    }
+    ultQueue.push({type:'air', x: hero.x, z: hero.z, t: 0.72, dmg: base*5.0, r: 4.4,
+                   big: true, mark: 0, col: u.col});
+    flash(0.16); SFX.boss();
+
+  } else if(id === 'shuriken'){
+    shock(hero.x, hero.z, u.col, 8, 0.55);
+    flash(0.14); speedLines(0.55, 180);
+    SFX.shoot();
+
+  } else if(id === 'scythe'){
+    /* 血月：先把 8 单位内敌人往自己这边拽 0.35 秒，再一刀 4 倍伤害 + 回血 */
+    ultRingFx.visible = true;
+    ultRingFx.material.color.set(u.col);
+    hero.ult.pullT = 0.35;
+    ultQueue.push({type:'slash', x: hero.x, z: hero.z, t: 0.38, dmg: base*4.0, r: 5.4, col: u.col});
+    flash(0.16); shake(0.3); SFX.boss();
+
+  } else if(id === 'spike'){
+    /* 荆棘爆发：以玩家为圆心 16 枚，先裂地再弹起 */
+    for(var k=0;k<16;k++){
+      var ang2 = k/16*TAU;
+      ultQueue.push({type:'spike', x: hero.x + Math.cos(ang2)*2.9,
+                     z: hero.z + Math.sin(ang2)*2.9, t: 0.28,
+                     dmg: base*0.9, col: u.col});
+    }
+    flash(0.12); shake(0.25); SFX.shoot();
+  }
+  toast('超武 · ' + u.name, u.col);
+  updateUltUI();
+}
+
+function updateUlt(dt){
+  if(!hero.ult) return;
+  if(hero.evoId && hero.ult.charge < 1){
+    hero.ult.charge = Math.min(1, hero.ult.charge + dt / ULT[hero.evoId].cd);
+  }
+  if(hero.ult.active > 0) hero.ult.active = Math.max(0, hero.ult.active - dt);
+
+  /* 贯穿光柱：持续期间每 0.1 秒结算一次，并在渲染里拉长 */
+  if(hero.ult.beamTick !== undefined && ultBeam.visible){
+    hero.ult.beamTick -= dt;
+    if(hero.ult.beamTick <= 0){
+      hero.ult.beamTick = 0.1;
+      var bd = WDEF[hero.evoId].dmg[4] * hero.stat.arch[WDEF[hero.evoId].arch] * 0.6;
+      damageBeam(hero.x, hero.z, hero.ult.ang, 2.2, bd);
+      burst(hero.x + Math.sin(hero.ult.ang)*3, 1.0, hero.z + Math.cos(hero.ult.ang)*3,
+            COS.warmwhite || 0xfff6e9, 3, 9, 0.7);
+    }
+    if(hero.ult.active <= 0){
+      ultBeam.visible = false; ultBeamCore.visible = false;
+      hero.ult.beamTick = undefined;
+    }
+  }
+
+  /* 血月：把敌人往中心拽 */
+  if(hero.ult.pullT > 0){
+    hero.ult.pullT -= dt;
+    forEachEnemy(function(e){
+      var dx = hero.x - e.x, dz = hero.z - e.z;
+      var d = Math.hypot(dx, dz) || 1;
+      if(d < 9){ e.x += dx/d * 7.5 * dt; e.z += dz/d * 7.5 * dt; }
+    });
+    var pk = 1 - Math.max(0, hero.ult.pullT) / 0.35;
+    ultRingFx.position.set(hero.x, 0.06, hero.z);
+    ultRingFx.scale.setScalar(1.2 + pk * 8.2);
+    ultRingFx.material.opacity = 0.75 * (1 - pk * 0.55);
+    if(hero.ult.pullT <= 0) ultRingFx.visible = false;
+  }
+
+  /* 延时结算队列 */
+  for(var i=ultQueue.length-1;i>=0;i--){
+    var q = ultQueue[i];
+    q.t -= dt;
+    if(q.type === 'air' && q.mark < 1){
+      /* 落点预告圈：0.45 秒里从外向内收，玩家能提前离开 */
+      q.mark += dt;
+    }
+    if(q.t > 0) continue;
+    ultQueue.splice(i, 1);
+    if(q.type === 'air'){
+      explode(q.x, q.z, q.dmg, q.r, q.big ? 7 : 3);
+      if(q.big){ flash(0.26); shake(0.5); }
+    } else if(q.type === 'slash'){
+      if(boss && !boss.dead && dist2(q.x,q.z,boss.x,boss.z) < (q.r+boss.r)*(q.r+boss.r))
+        hurtEnemy(boss, q.dmg, false);
+      forEachEnemy(function(e){
+        if(dist2(q.x,q.z,e.x,e.z) < (q.r+e.r)*(q.r+e.r)) hurtEnemy(e, q.dmg, false);
+      });
+      hero.hp = Math.min(hero.maxhp, hero.hp + 12);
+      shock(q.x, q.z, q.col, 10, 0.6);
+      burst(q.x, 0.9, q.z, q.col, 22, 13, 1.3);
+      SFX.crit();
+    } else if(q.type === 'spike'){
+      addSpike(q.x, q.z, q.dmg, 5, true, hero.stat.range);
+    }
+  }
+
+  updateUltUI();
+}
 
 /* ═══════════ 属性 ═══════════ */
 hero.weapons = [{id:'bow', lv:1, cd:0, tick:0}];
 hero.passives = {};
-hero.stat = {atk:1, as:1, spd:9.2, pick:4.6, crit:0.06};
+hero.stat = {atk:1, as:1, spd:9.2, pick:4.6, crit:0.06, range:1,
+  arch:{melee:1, throw:1, shot:1}, archN:{melee:0, throw:0, shot:0}};
 
 function hasWeapon(id){
   for(var i=0;i<hero.weapons.length;i++) if(hero.weapons[i].id===id) return hero.weapons[i];
   return null;
 }
+/* 流派乘区的唯一计算点。
+   伤害 = 武器基础 × 流派倍率（1 + 精通等级×20%）× 套装（同流派 2 把 ×1.30）× 极限突破
+   副属性：贴身给范围、投掷给暴击、射击给攻速 —— 三条线的手感从这里开始分岔。 */
 function refreshStats(){
   var p = hero.passives;
-  hero.stat.atk  = 1 + (p.atk||0)*0.14;
-  hero.stat.as   = 1 + (p.aspd||0)*0.12;
-  hero.stat.spd  = hero.speed * (1 + (p.move||0)*0.06);
-  hero.stat.pick = 4.6 * (1 + (p.magnet||0)*0.30);
-  hero.stat.crit = 0.06 + (p.crit||0)*0.07;
+  ARCH_KEYS.forEach(function(a){
+    var cnt = 0;
+    for(var i=0;i<hero.weapons.length;i++){
+      if(WDEF[hero.weapons[i].id].arch === a) cnt++;
+    }
+    var mul = 1 + (p[a]||0)*ARCH_DMG;
+    if(cnt >= 2) mul *= SET_BONUS;
+    hero.stat.arch[a] = mul;
+    hero.stat.archN[a] = cnt;
+  });
+  hero.stat.as    = 1 + (p.shot||0)*0.05;
+  hero.stat.crit  = 0.06 + (p.throw||0)*0.04;
+  hero.stat.range = 1 + (p.melee||0)*0.06;
+  hero.stat.spd   = hero.speed * (1 + (p.move||0)*0.06);
+  hero.stat.pick  = 4.6 * (1 + (p.magnet||0)*0.30);
   var newMax = 100 + (p.hp||0)*18;
   if(newMax !== hero.maxhp){
     var add = newMax - hero.maxhp;
@@ -2773,7 +3146,8 @@ function nearestEnemy(x, z, maxR){
 /* ═══════════ 开火 ═══════════ */
 function fireWeapon(w, st, ang, dist, tgt){
   var lv = w.lv, def = WDEF[w.id], evo = !!w.evo;
-  var dmg = def.dmg[lv-1] * st.atk * (1 + 0.08*(w.plus||0));
+  /* 只有本流派的精通卡加成这把武器。混着点 = 每把都只吃到一半。 */
+  var dmg = def.dmg[lv-1] * st.arch[def.arch] * (1 + 0.08*(w.plus||0));
   var isCrit = Math.random() < st.crit;
   if(isCrit) dmg *= 2.0;
   var sx = Math.sin(ang), cz = Math.cos(ang);
@@ -2781,8 +3155,14 @@ function fireWeapon(w, st, ang, dist, tgt){
     burst(hero.x + sx*0.78, 1.05, hero.z + cz*0.78, 0xfff6e9, 2, 4.6, 0.5);
   }
 
+  /* 超武必杀的形态变化（只在 active 期间生效） */
+  var ultOn = hero.ult && hero.ult.active > 0;
+  var ultBow = ultOn && hero.evoId === 'bow';
+  var ultShu = ultOn && hero.evoId === 'shuriken';
+
   if(w.id === 'bow'){
     var n = evo ? 12 : [1,2,3,3,5][lv-1];
+    if(ultBow) n += 2;
     var pierce = evo ? 99 : (lv >= 4 ? 2 : 0);
     var bspd = evo ? 36 : 32;
     var bdm = evo ? dmg*1.45 : dmg;
@@ -2818,16 +3198,21 @@ function fireWeapon(w, st, ang, dist, tgt){
 
   } else if(w.id === 'shuriken'){
     var ns = evo ? 4 : [1,1,2,3,4][lv-1];
+    if(ultShu) ns *= 2;
     for(var c2=0;c2<ns;c2++){
-      var a4 = ang + (c2-(ns-1)/2)*(evo?0.9:0.22);
+      var a4 = ang + (c2-(ns-1)/2)*(ultShu ? 0.52 : (evo?0.9:0.22));
+      var sspd = ultShu ? 47 : 26;
       spawnBullet({pool:'B', x:hero.x, y:1.0, z:hero.z,
-        vx:Math.sin(a4)*26, vz:Math.cos(a4)*26, dmg:evo?dmg*1.5:dmg, pierce:evo?3:0,
-        life:evo?3.2:1.5, r:0.42, kind:'shuriken', spin:1, homing:evo?1:(lv>=5?1:0)});
+        vx:Math.sin(a4)*sspd, vz:Math.cos(a4)*sspd,
+        dmg:ultShu ? dmg*1.15 : (evo?dmg*1.5:dmg),
+        pierce:ultShu ? 99 : (evo?3:0),
+        life:ultShu ? 2.1 : (evo?3.2:1.5), r:0.42, kind:'shuriken', spin:1,
+        homing:evo?1:(lv>=5?1:0)});
     }
     SFX.shoot();
 
   } else if(w.id === 'scythe'){
-    var R = (2.0 + lv*0.32) * (evo ? 1.6 : 1);
+    var R = (2.0 + lv*0.32) * (evo ? 1.6 : 1) * st.range;
     var tickDmg = evo ? dmg*1.35 : dmg;
     forEachEnemy(function(e){
       if(dist2(hero.x, hero.z, e.x, e.z) < (R+e.r)*(R+e.r)) hurtEnemy(e, tickDmg, isCrit);
@@ -2843,7 +3228,7 @@ function fireWeapon(w, st, ang, dist, tgt){
     for(var s2=0;s2<nsp;s2++){
       var aa = back + (s2-(nsp-1)/2)*0.7;
       var dd = rnd(1.4, 2.6);
-      addSpike(hero.x + Math.sin(aa)*dd, hero.z + Math.cos(aa)*dd, dmg*(evo?0.85:0.55), lv, evo);
+      addSpike(hero.x + Math.sin(aa)*dd, hero.z + Math.cos(aa)*dd, dmg*(evo?0.85:0.55), lv, evo, st.range);
     }
     SFX.shoot();
   }
@@ -2862,7 +3247,9 @@ function updateWeapons(dt){
     var d = Math.sqrt(dx*dx+dz*dz) || 1;
     var ang = Math.atan2(dx, dz);
     fireWeapon(w, st, ang, d, tgt);
-    w.cd = def.cd[w.lv-1] / st.as;
+    /* 暴雨模式期间弓箭攻速 ×2.6（只作用于弓，不作用于其它武器） */
+    var rush = (hero.ult && hero.ult.active > 0 && hero.evoId === 'bow' && w.id === 'bow') ? 1.8 : 1;
+    w.cd = def.cd[w.lv-1] / st.as / rush;
   }
 }
 
@@ -2870,14 +3257,25 @@ function updateWeapons(dt){
 var spikeGeo = new THREE.ConeGeometry(0.34, 1.1, 4);
 var spikePool = instPool(spikeGeo, toon(COS.pur), 90);
 var spikes = [];
-function addSpike(x, z, dmg, lv, evo){
+function addSpike(x, z, dmg, lv, evo, rng){
   if(spikes.length > 85) return;
-  spikes.push({x:x, z:z, dmg:dmg, life:evo?3.6:2.6, max:evo?3.6:2.6, tick:0, lv:lv, evo:!!evo, born:0});
+  spikes.push({x:x, z:z, dmg:dmg, life:evo?3.6:2.6, max:evo?3.6:2.6,
+               tick:0, lv:lv, evo:!!evo, born:0, rng:rng||1});
 }
 
 /* ═══════════ 伤害与死亡 ═══════════ */
 function hurtEnemy(e, dmg, isCrit){
   if(e.dead) return;
+  if(e.boss) e.dmgTaken = (e.dmgTaken || 0) + (e.invulnT > 0 ? 0 : dmg);
+  /* BOSS 转阶段/狂暴期间无敌：伤害进不来，但要给玩家一个明确反馈，
+     否则会以为「打不动是数值出问题了」。 */
+  if(e.boss && e.invulnT > 0){
+    if(Math.random() < 0.12){
+      var ip = toScreen(e.x, 2.2, e.z);
+      popDmg('免疫', ip.x, ip.y, '#9fb3c8');
+    }
+    return;
+  }
   e.hp -= dmg;
   e.hit = 1;
   if(isCrit){
@@ -2928,7 +3326,7 @@ function explode(x, z, dmg, radius, lv){
   burst(x, 1.0, z, COS.yel, 14, 10, 1.2);
   burst(x, 1.0, z, COS.mag, 8, 8, 1.0);
   S.hitstop = 0.05;
-  shake(0.3); flash(0.14);
+  shake(0.22); flash(0.14);
   SFX.kill();
   forEachEnemy(function(e){
     if(dist2(x,z,e.x,e.z) < (radius+e.r)*(radius+e.r)) hurtEnemy(e, dmg, false);
@@ -2958,44 +3356,64 @@ function gainXP(v){
 }
 
 function buildChoices(){
-  var opts = [];
-  // 1. 超武进化：整局只能拿一把，拿了之后这条路就锁死了
+  var pool = [];
+  function add(c, w){ pool.push({c:c, w:w}); }
+
+  // 1. 超武进化：必出（最多占满三张）
+  var out = [];
   if(!hero.evoId){
     hero.weapons.forEach(function(w){
       var ev = EVO[w.id];
-      if(ev && w.lv >= 5 && !w.evo && (hero.passives[ev.req] || 0) >= 3) opts.push({t:'evo', id:w.id});
+      if(ev && w.lv >= 5 && !w.evo && (hero.passives[ev.req] || 0) >= 3) out.push({t:'evo', id:w.id});
     });
   }
+  if(out.length > 3) out.length = 3;
+
   // 2. 武器升级
   hero.weapons.forEach(function(w){
-    if(w.lv < WDEF[w.id].max) opts.push({t:'wup', id:w.id});
+    if(w.lv < WDEF[w.id].max) add({t:'wup', id:w.id}, 2.0);
   });
-  // 3. 新武器
-  /* 武器槽一共 4 个，但原来卡池写死 < 3，玩家永远拿不到第 4 把，
-     右下角第 4 个槽一直空着。现在前 3 把随时可拿，第 4 把留到第 8 波之后——
-     既让 4 个槽都有用，又不会让前中期变简单（前中期多一把武器会显著降低难度）。 */
+
+  // 3. 新武器：已经有同流派武器 → 加权，让卡池把你往一条线上推
   var wLimit = S.wave >= 8 ? 4 : 3;
   if(hero.weapons.length < wLimit){
-    WKEYS.forEach(function(id){ if(!hasWeapon(id)) opts.push({t:'wnew', id:id}); });
+    WKEYS.forEach(function(id){
+      if(hasWeapon(id)) return;
+      var a = WDEF[id].arch;
+      var w = 1.0;
+      if(hero.stat.archN[a] >= 1) w = 1.5;
+      if((hero.passives[a] || 0) >= 2) w = 1.9;
+      add({t:'wnew', id:id}, w);
+    });
   }
-  // 4. 被动
+
+  // 4. 被动。流派卡：已带该流派武器才值得点（1.8），否则基本不给（0.45）
   PKEYS.forEach(function(id){
-    if((hero.passives[id]||0) < PDEF[id].max) opts.push({t:'pas', id:id});
+    if((hero.passives[id] || 0) >= PDEF[id].max) return;
+    var w = 1.0;
+    var a = PDEF[id].arch;
+    if(a) w = (hero.stat.archN[a] >= 1) ? 1.8 : 0.45;
+    add({t:'pas', id:id}, w);
   });
-  // 5. 极限突破：满级武器可无限叠加，保证池子永不为空
+
+  // 5. 极限突破
   hero.weapons.forEach(function(w){
-    if(w.lv >= WDEF[w.id].max) opts.push({t:'limit', id:w.id});
+    if(w.lv >= WDEF[w.id].max) add({t:'limit', id:w.id}, 0.9);
   });
 
-  shuffle(opts);
+  // 加权无放回抽，直到 3 张
+  while(out.length < 3 && pool.length){
+    var total = 0, i;
+    for(i=0;i<pool.length;i++) total += pool[i].w;
+    var r = Math.random() * total, k = pool.length - 1;
+    for(i=0;i<pool.length;i++){
+      r -= pool[i].w;
+      if(r <= 0){ k = i; break; }
+    }
+    out.push(pool[k].c);
+    pool.splice(k, 1);
+  }
 
-  var out = [];
-  for(var i=0;i<opts.length && out.length<3;i++){
-    if(opts[i].t === 'evo') out.push(opts[i]);
-  }
-  for(var j=0;j<opts.length && out.length<3;j++){
-    if(out.indexOf(opts[j]) < 0) out.push(opts[j]);
-  }
   if(hero.hp < hero.maxhp*0.45 && out.length >= 2) out[2] = {t:'heal'};
   while(out.length < 3){
     out.push({t:'limit', id: hero.weapons[0] ? hero.weapons[0].id : 'bow'});
@@ -3029,21 +3447,22 @@ function openLevelUp(refresh){
       gain = 'Lv.' + w.lv + ' → Lv.' + (w.lv + 1);
       ds = d.lv[w.lv];
     } else if(c.t === 'wnew'){
-      /* 原来写「新武器 / Lv.1 解锁」，玩家在快速点卡时很容易以为是普通升级，
-         后来发现背包里多了一把，就会觉得「我没选过它怎么自己出现了」。
-         现在直接说清：会多一把、占掉一个槽位、槽位从几变几。 */
-      var d2 = WDEF[c.id];
+      /* 新武器卡必须说清「会多一把、占一个槽、属于哪条线」，
+         否则玩家点完发现背包里多了东西，会以为是自己没选就自动装上了。 */
+      var d2 = WDEF[c.id], aNew = ARCH[d2.arch];
       nm = d2.name; ic = d2.short; col = d2.col;
-      kd = '新武器 · 会占一个槽位';
+      var nNow = hero.stat.archN[d2.arch] || 0;
+      kd = aNew.name + '线 · 会占一个槽位';
       gain = '武器 ' + hero.weapons.length + ' 把 → ' + (hero.weapons.length + 1) + ' 把';
-      ds = d2.lv[0];
+      ds = d2.lv[0] + (nNow === 1 ? '　（与已有同线武器凑成套装 +30%）' : '');
       el.classList.add('newc');
     } else if(c.t === 'pas'){
       var p = PDEF[c.id], lvp = (hero.passives[c.id]||0);
       nm = p.name; ic = p.short; col = p.col;
-      kd = '被动';
+      kd = p.arch ? ('流派精通 · ' + ARCH[p.arch].name + '线') : '通用被动';
       gain = 'Lv.' + lvp + ' → Lv.' + (lvp + 1);
       ds = p.txt(lvp + 1);
+      if(p.arch) el.classList.add('archc');
     } else if(c.t === 'evo'){
       var ev = EVO[c.id], de = WDEF[c.id];
       nm = ev.name; ic = de.short; col = ev.col;
@@ -3099,6 +3518,8 @@ function takeChoice(c){
     var we = hasWeapon(c.id);
     if(we) we.evo = true;
     hero.evoId = c.id;
+    hero.ult.charge = 1;      /* 进化当场满蓄力，立刻能试一次 */
+    updateUltUI();
     toast('超武进化　' + EVO[c.id].name, '#ffe600');
     flash(0.3); shake(0.4);
   } else if(c.t === 'limit'){
@@ -3184,10 +3605,16 @@ function estimateDPS(single){
   var total = 0, st = hero.stat;
   hero.weapons.forEach(function(w){
     var d = WDEF[w.id];
-    var dmg = d.dmg[w.lv-1] * st.atk * (1 + 0.08*(w.plus||0));
+    var dmg = d.dmg[w.lv-1] * st.arch[d.arch] * (1 + 0.08*(w.plus||0));
     var cd = d.cd[w.lv-1] / st.as;
     var cnt = w.evo ? d.cntEvo : d.cnt[w.lv-1];
-    var coef = single ? 1 : (w.evo ? d.coefEvo : d.coef);
+    /* 单目标口径：不再假设「每一发都打中同一个目标」。
+       扇形散射的 12 支箭，对着一只 BOSS 实际只有一半左右能命中 ——
+       实测（tests/dps-probe）弓箭超武理论 1023、实际 527，正好两倍。
+       每把武器一个 sHit 系数，就是从实测反推的命中率。 */
+    var sh = w.evo ? (d.sHitEvo == null ? (d.sHit == null ? 1 : d.sHit) : d.sHitEvo)
+                   : (d.sHit == null ? 1 : d.sHit);
+    var coef = single ? sh : (w.evo ? d.coefEvo : d.coef);
     total += dmg * cnt / cd * coef;
   });
   return Math.round(total);
@@ -3327,7 +3754,11 @@ addEventListener('keydown', function(e){
     AUDIO.apply();
     refreshMuteUI();
   }
-  if(k === ' ' && S.mode === 'over'){ e.preventDefault(); startGame(); }
+  if(k === ' '){
+    e.preventDefault();
+    if(S.mode === 'over') startGame();
+    else if(S.mode === 'play') triggerUlt();
+  }
 });
 addEventListener('keyup', function(e){
   keys[(e.key||'').toLowerCase()] = false;
@@ -3527,12 +3958,21 @@ function spawnBoss(){
      理论 DPS 假设「每一发都命中」。实战里玩家要躲冲锋、躲弹幕，
      有效输出时间约占 60-75%，所以目标秒数按这个折损定。 */
   var liveDps = currentBossDPS();
-  var targetTtk = kind === 'hands' ? 20 : 12;
+  /* 目标「墙钟」时长：第 5 波 32 秒、第 10 波 45 秒。
+     依据：TapTap《游戏数值设计规范》给前期 Boss 30-60 秒；
+     我们这局总共 5-6 分钟，两场 Boss 合计约 77 秒，占 22%，不会拖。
+     注意这两个数是墙钟，血量要扣掉「无效输出窗口」的部分。 */
+  var targetTtk = kind === 'hands' ? 45 : 32;
+  /* 转阶段 4.5 秒 + 狂暴 2.5 秒共 7 秒无敌，这段时间打不出伤害。
+     所以「有效输出窗口」= 目标墙钟 - 7。
+     sHit 已经按实测校准过（近距离 BOSS 会贴上来），
+     estimateDPS(single) 和真实输出基本对齐，所以这里直接扣时间。 */
+  var dmgWindow = targetTtk - 7;
   /* 不设血量下限。上一版给了 2600 的下限「防止 BOSS 变纸」，
      结果弱配装（DPS 30）要打 87 秒 —— 下限本意是保护体验，
      实际保护的是「BOSS 的尊严」，牺牲的是玩家的时间。
      完全跟随 DPS 反而最公平：谁打都是 ttk 秒。 */
-  var hp = Math.max(260, Math.round(liveDps * targetTtk));
+  var hp = Math.max(260, Math.round(liveDps * dmgWindow));
 
   /* ── 出场序列：清场 → 白闪震屏 → 从地下升起 ── */
   var cleared = clearMinionsForBoss();
@@ -3557,6 +3997,8 @@ function spawnBoss(){
      玩家能看懂为什么血条这么长，也方便回看时判断数值是否合理。 */
   boss.dpsAtSpawn = liveDps;
   boss.planTtk = targetTtk;
+  boss.dmgWindow = dmgWindow;
+  boss.dmgTaken = 0; boss.calibT = 0; boss.calibrated = false;
 
   SFX.boss();
   BGM.setMode('boss');
@@ -3690,10 +4132,25 @@ function updateEnemies(dt){
         if(d > 13){ /* 靠近 */ }
         else if(d < 8){ spd = -e.spd*0.85; }
         else { spd = 0; }
-        if(e.cd <= 0 && d < 17){
-          e.cd = 2.8;
-          spawnEBullet(e.x, e.z, nx*11, nz*11, e.dmg);
-          SFX.shoot();
+
+        /* 抬手 0.45 秒再开火。
+           原来是冷却一到子弹凭空出现，玩家只能等它飞到眼前才知道被瞄了。
+           0.45 秒是「来得及反应、又不至于慢到没威胁」的折中：
+           论文测出预警普遍在 800ms，但玩家实际只在最后 200-300ms 才注意到，
+           所以预警必须带一个「越来越亮/越来越小」的收束过程。 */
+        if(e.wind > 0){
+          e.wind -= dt;
+          if(spd === 0){ /* 蓄力时站定，不飘 */ }
+          if(e.wind <= 0){
+            spawnEBullet(e.x, e.z, nx*11, nz*11, e.dmg);
+            burst(e.x + nx*0.6, 1.15, e.z + nz*0.6, 0xff2e88, 6, 6.5, 0.7);
+            shock(e.x, e.z, 0xff2e88, 2.4, 0.32);
+            SFX.eshoot();
+            e.cd = 2.8;
+          }
+        } else if(e.cd <= 0 && d < 17){
+          e.wind = 0.45;
+          e.windMax = 0.45;
         }
       }
 
@@ -3738,14 +4195,75 @@ function updateBoss(dt){
     return;
   }
 
-  /* 血量过半进狂暴：招式更快，这是「有挑战感」的来源之一 */
-  if(!b.rage && b.hp < b.maxhp * 0.5){
+  /* ── 开战 3.5 秒后按「真实输出」重新校准血量 ──
+     为什么不能只靠估算：estimateDPS 是理论值，扇形武器的命中率随距离、
+     目标移动大幅变化（实测同一套配装从 373 到 1211 DPS 都出现过）。
+     估算偏差会让 BOSS 时而秒杀、时而打不动 —— 这正是最初的问题。
+     做法：先按估算配血，打 3.5 秒后量一次真实 DPS，
+     把血量按比例改成「真实 DPS × 目标窗口」，然后血条重置为满。
+     这样无论什么配装，墙钟时长都落在目标附近；玩家不会看到血条倒退。 */
+  if(!b.calibrated){
+    b.calibT += dt;
+    if(b.calibT >= 3.5 && b.dmgTaken > 0){
+      var realDps = b.dmgTaken / b.calibT;
+      if(realDps > 1){
+        var want = Math.max(300, realDps * (b.dmgWindow || 25));
+        b.maxhp = Math.round(want);
+        b.hp = b.maxhp;
+        b.dpsAtSpawn = Math.round(realDps);
+      }
+      b.calibrated = true;
+    }
+  }
+
+  /* ── 阶段：用「打不到的时间」拉长战斗，而不是把血条堆成海绵 ──
+     62% 转阶段：4.5 秒无敌 + 召唤 6 只小兵 + 震屏，玩家必须先清场或拉开距离；
+     30% 狂暴：2.5 秒无敌 + 招式提速 35%，战斗节奏换挡。
+     无敌期间 hurtEnemy 直接返回，屏幕提示「免疫」。 */
+  if(b.invulnT > 0){
+    b.invulnT -= dt;
+    if(b.shield){
+      b.shield.visible = true;
+      b.shield.rotation.y += dt * 1.6;
+      b.shield.rotation.x += dt * 0.9;
+      b.shield.material.opacity = 0.20 + 0.18 * Math.abs(Math.sin(b.t * 6));
+    }
+    /* 无敌时缓慢后撤，逼玩家追，同时把场地让出来 */
+    var bdx = b.x - hero.x, bdz = b.z - hero.z;
+    var bd = Math.hypot(bdx, bdz) || 1;
+    if(bd < 8){ b.x += bdx/bd * 2.4 * dt; b.z += bdz/bd * 2.4 * dt; }
+    b.obj.position.set(b.x, b.baseY + Math.sin(b.t*4)*0.12, b.z);
+    if(b.invulnT <= 0 && b.shield){ b.shield.visible = false; }
+    return;
+  }
+
+  if(!b.phase2 && b.hp < b.maxhp * 0.62){
+    b.phase2 = true;
+    b.invulnT = 4.5;
+    if(b.shield) b.shield.visible = true;
+    flash(0.34); shake(0.55);
+    shock(b.x, b.z, COS.cyn, 16, 0.9);
+    burst(b.x, 1.0, b.z, 0xff2e88, 26, 12, 1.4);
+    /* 召唤 6 只小兵，逼玩家一边躲一边清 */
+    for(var mi=0;mi<6;mi++){
+      var ma = mi/6*TAU;
+      spawnEnemy(mi % 2 ? 'spiker' : 'blob', b.x + Math.cos(ma)*3.4, b.z + Math.sin(ma)*3.4, {});
+    }
+    toast(b.kind === 'hands' ? '第二阶段 · 护体墨甲' : '第二阶段 · 硬化外壳', '#00e5ff');
+    SFX.boss();
+  }
+
+  if(!b.phase3 && b.hp < b.maxhp * 0.30){
+    b.phase3 = true;
     b.rage = true;
-    flash(0.3); shake(0.7);
-    shock(b.x, b.z, COS.red, 9, 0.6);
+    b.invulnT = 2.5;
+    if(b.shield) b.shield.visible = true;
+    flash(0.4); shake(0.7);
+    shock(b.x, b.z, COS.red, 12, 0.7);
     toast(b.kind === 'hands' ? '千手墨神 · 狂怒' : '裂口巨兽 · 狂怒', '#ff2e88');
     SFX.boss();
   }
+
   var rageK = b.rage ? 1.35 : 1;
 
   if(b.kind === 'hands') updateHandsBoss(b, dt, rageK);
@@ -3951,13 +4469,19 @@ function updateBulletArr(arr, dt){
         }
       }
     }
-    if(!gone && boss && !boss.dead){
+    /* BOSS 是一体目标，一颗子弹只能打它一次。
+       原来这里没有「已命中」标记：穿透弹停在 BOSS 体内时会逐帧结算，
+       60 帧/秒都在掉血 —— 实测单把五级弓打出 1211 DPS，而理论只有 213。
+       这是「BOSS 被秒杀」的真正原因，跟血量公式无关。
+       hitList 是给多个小怪用的，对 BOSS 用单独的 bossHit 标记。 */
+    if(!gone && boss && !boss.dead && !b.bossHit){
       var br = b.r + boss.r;
       if(dist2(b.x,b.z,boss.x,boss.z) < br*br){
-        if(b.kind === 'bomb') b.life = 0;
+        if(b.kind === 'bomb'){ b.life = 0; }
         else{
+          b.bossHit = true;
           hurtEnemy(boss, b.dmg, false);
-          if(b.pierce > 0 && b.hitList){ b.pierce--; b.hitList.push(null); }
+          if(b.pierce > 0 && b.hitList) b.pierce--;
           else gone = true;
         }
       }
@@ -3975,7 +4499,7 @@ function updateEBullets(dt){
     if(b.life <= 0 || Math.hypot(b.x,b.z) > ARENA_R + 3){ eBullets.splice(i,1); continue; }
     if(dist2(b.x,b.z,hero.x,hero.z) < 0.95*0.95){
       hurtHero(b.dmg);
-      burst(b.x, 1, b.z, COS.yel, 5, 5, 0.8);
+      burst(b.x, 1, b.z, 0xff2e88, 6, 6, 0.85);
       eBullets.splice(i,1);
     }
   }
@@ -3989,7 +4513,7 @@ function updateSpikes(dt){
     if(s.life <= 0){ spikes.splice(i,1); continue; }
     if(s.tick <= 0){
       s.tick = 0.34;
-      var R = (1.25 + s.lv*0.12) * (s.evo ? 1.5 : 1);
+      var R = (1.25 + s.lv*0.12) * (s.evo ? 1.5 : 1) * (s.rng || 1);
       forEachEnemy(function(e){
         if(dist2(s.x,s.z,e.x,e.z) < (R+e.r)*(R+e.r)) hurtEnemy(e, s.dmg, false);
       });
@@ -4045,6 +4569,23 @@ function updateChests(dt){
 }
 
 /* ═══════════ 渲染同步 ═══════════ */
+function renderUltBeam(){
+  if(!ultBeam.visible) return;
+  var ang = hero.ult.ang || 0;
+  var L = 58;
+  var cx = hero.x + Math.sin(ang) * L/2;
+  var cz = hero.z + Math.cos(ang) * L/2;
+  ultBeam.position.set(cx, 1.0, cz);
+  ultBeam.rotation.set(0, ang, 0);
+  ultBeam.scale.set(4.4, 1, L);
+  ultBeamCore.position.set(cx, 1.0, cz);
+  ultBeamCore.rotation.set(0, ang, 0);
+  ultBeamCore.scale.set(1.9, 1, L);
+  var k = clamp(hero.ult.active / 0.55, 0, 1);
+  ultBeam.material.opacity = 0.55 + 0.4 * k;
+  ultBeamCore.material.opacity = 0.85 * k + 0.1;
+}
+
 function renderBullets(){
   var n = 0;
   for(var i=0;i<bullets.length;i++){
@@ -4074,17 +4615,43 @@ function renderBullets(){
   }
   bulB.count = m; bulB.instanceMatrix.needsUpdate = true;
 
-  var q = 0;
+  /* 敌弹四层 + 两段拖尾。拖尾位置按速度反推，不需要额外状态。 */
+  var q = 0, tr = 0;
   for(var k=0;k<eBullets.length;k++){
     var b3 = eBullets[k];
+    var ux = b3.vx / b3.sp, uz = b3.vz / b3.sp;
+    var pulse = 1 + Math.sin(b3.phase * 9) * 0.07;   // 轻微脉动，比静止更抓眼
+
+    /* 拖尾：越往后越小越淡（用两段模拟） */
+    for(var t2=1;t2<=2;t2++){
+      if(tr >= 400) break;
+      _dm.position.set(b3.x - ux*t2*0.42, b3.y, b3.z - uz*t2*0.42);
+      _dm.rotation.set(b3.phase + t2, b3.phase*0.5, 0);
+      _dm.scale.setScalar((1.05 - t2*0.22) * pulse);
+      _dm.updateMatrix();
+      eBulTrail.setMatrixAt(tr++, _dm.matrix);
+    }
+
     _dm.position.set(b3.x, b3.y, b3.z);
     _dm.rotation.set(b3.phase, b3.phase*0.5, 0);
-    _dm.scale.setScalar(1.25);
+
+    _dm.scale.setScalar(1.55 * pulse);          // 黑壳
     _dm.updateMatrix();
-    bulC.setMatrixAt(q++, _dm.matrix);
-    if(q >= 200) break;
+    if(q < 200) eBulShell.setMatrixAt(q, _dm.matrix);
+
+    _dm.scale.setScalar(1.32 * pulse);          // 洋红本体
+    _dm.updateMatrix();
+    if(q < 200) eBulBody.setMatrixAt(q, _dm.matrix);
+
+    _dm.scale.setScalar(1.32 * pulse);          // 粉白内核（略前移，像弹头）
+    _dm.position.set(b3.x + ux*0.10, b3.y + 0.02, b3.z + uz*0.10);
+    _dm.updateMatrix();
+    if(q < 200) eBulCore.setMatrixAt(q++, _dm.matrix);
   }
-  bulC.count = q; bulC.instanceMatrix.needsUpdate = true;
+  eBulShell.count = q; eBulShell.instanceMatrix.needsUpdate = true;
+  eBulBody.count = q; eBulBody.instanceMatrix.needsUpdate = true;
+  eBulCore.count = q; eBulCore.instanceMatrix.needsUpdate = true;
+  eBulTrail.count = tr; eBulTrail.instanceMatrix.needsUpdate = true;
 }
 
 function renderGems(){
@@ -4156,6 +4723,7 @@ function update(dt){
 
   shadowIdx = 0;
   updateHero(dt);
+  updateUlt(dt);
   updateWeapons(dt);
   updateEnemies(worldDt);
   updateBoss(worldDt);
@@ -4176,6 +4744,7 @@ function update(dt){
 
   // 渲染同步
   renderEnemies();
+  renderUltBeam();
   renderBullets();
   renderGems();
   renderSpikes();
@@ -4191,6 +4760,28 @@ function update(dt){
 /* ═══════════ 流程 ═══════════ */
 var chosenHero = 'swift';
 var chosenRate = 1.0;
+
+/* 起手配置只在这里定义一次。
+   原来 resetGame 和 backToTitle 各写了一份，改流派时必然漏掉一处 ——
+   这个项目已经因为同样的问题踩过三次（宝箱塞武器、刷新权重、描边参数）。 */
+function initHeroLoadout(){
+  hero.speed = 9.2;
+  hero.evoId = null;
+  hero.ult = {charge: 0, active: 0, pullT: 0, ang: 0, beamTick: undefined};
+  ultQueue.length = 0;
+  ultBeam.visible = false; ultBeamCore.visible = false; ultRingFx.visible = false;
+  if(chosenHero === 'swift'){
+    /* 疾风＝射击线：弓 + 射击精通 1 级 */
+    hero.speed = 10.4;
+    hero.weapons = [{id:'bow', lv:1, cd:0, tick:0}];
+    hero.passives = {move:1, shot:1};
+  } else {
+    /* 铁壁＝贴身线：环绕镰 + 贴身精通 1 级 */
+    hero.speed = 9.0;
+    hero.weapons = [{id:'scythe', lv:1, cd:0, tick:0}];
+    hero.passives = {hp:1, melee:1};
+  }
+}
 
 /* 清空世界里的全部实体。
    「再来一局」和「回到主菜单」都要用它，所以单独抽出来。
@@ -4219,13 +4810,7 @@ function resetGame(){
   hero.hp = 100; hero.maxhp = 100;
   hero.lv = 1; hero.xp = 0; hero.xpNext = 9;
   hero.alive = true; hero.invuln = 0;
-  hero.speed = 9.2;
-  hero.weapons = [{id:'bow', lv:1, cd:0, tick:0}];
-  hero.passives = {};
-  hero.evoId = null;
-
-  if(chosenHero === 'swift'){ hero.speed = 10.4; hero.passives.move = 1; }
-  else { hero.passives.hp = 1; }
+  initHeroLoadout();
 
   S.t = 0; S.wave = 1; S.waveT = 0; S.kills = 0;
   S.mode = 'play'; S.over = false; S.victory = false; S.hitstop = 0;
@@ -4264,12 +4849,7 @@ function backToTitle(){
   hero.hp = 100; hero.maxhp = 100;
   hero.lv = 1; hero.xp = 0; hero.xpNext = 9;
   hero.invuln = 0; hero.alive = true;
-  hero.speed = 9.2;
-  hero.weapons = [{id:'bow', lv:1, cd:0, tick:0}];
-  hero.passives = {};
-  hero.evoId = null;
-  if(chosenHero === 'swift'){ hero.speed = 10.4; hero.passives.move = 1; }
-  else { hero.passives.hp = 1; }
+  initHeroLoadout();
   refreshStats();
   hero.hp = hero.maxhp;
 
@@ -4570,7 +5150,8 @@ function buildCodexPassive(){
     var head =
       '<div class="cx-head">' + codexBlob([d.col, '#ffffff', '#0a0a12']) +
         '<div><div class="cx-name">' + d.name + '</div>' +
-        '<span class="cx-tag">被动 · 最多 ' + d.max + ' 级</span></div>' +
+        '<span class="cx-tag">' + (d.arch ? ('流派精通 · ' + ARCH[d.arch].name + '线') : '通用被动') +
+        ' · 最多 ' + d.max + ' 级</span></div>' +
       '</div>';
     var body = '<div class="cx-look">' + d.txt(1) + '（每级）</div>' +
       '<div class="cx-stats">' +
@@ -4591,7 +5172,11 @@ function buildCodexPassive(){
       '</div>',
       '<div class="cx-look">' + ev.desc + '</div>' +
       '<div class="cx-evo">前置：' + w.name + ' 满级 + ' + PDEF[ev.req].name + ' 3 级</div>' +
-      '<div class="cx-note">' + ev.gain + '</div>'
+      '<div class="cx-note">' + ev.gain + '</div>' +
+      '<div class="cx-look" style="font-size:11.5px"><b>必杀：</b>' +
+        (ULT[id] ? ULT[id].name + '　蓄满按空格释放' : '') +
+        '<br>周期 ' + (ULT[id] ? ULT[id].cd : '?') + ' 秒 · ' +
+        (ULT[id] ? ULT[id].tip : '') + '</div>'
     );
   });
   return html;
@@ -4628,6 +5213,7 @@ if($('codexTabs')){
 
 $('startbtn').onclick = startGame;
 $('bagbtn').onclick = function(){ toggleBag(); };
+$('ultbox').onclick = function(){ triggerUlt(); };
 $('bagclose').onclick = function(){ toggleBag(); };
 $('resume').onclick = function(){ togglePause(); };
 $('quitbtn').onclick = function(){
@@ -4825,6 +5411,8 @@ window.POW = {
   hurtHero:hurtHero, hurtEnemy:hurtEnemy, EVO:EVO, buildChoices:buildChoices,
   openLevelUp:openLevelUp, renderBag:renderBag, estimateDPS:estimateDPS,
   spawnEnemy:spawnEnemy, spawnGem:spawnGem, ETYPES:ETYPES, camera:camera, renderer:renderer, eMesh:eMesh,
+  refreshStats:refreshStats, ARCH:ARCH, PKEYS:PKEYS, ULT:ULT,
+  getBoss: function(){ return boss; }, triggerUlt: triggerUlt,
   getAudio: function(){ return {ac: AC, bgm: BGM, master: masterGain}; },
   get boss(){ return boss; }
 };
