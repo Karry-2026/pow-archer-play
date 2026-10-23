@@ -289,7 +289,8 @@ h1.logo em{font-style:normal;color:var(--yel);display:block}
 #rotate{position:fixed;inset:0;z-index:95;background:var(--ink);display:none;
   flex-direction:column;align-items:center;justify-content:center;gap:22px;
   text-align:center;padding:28px}
-#rotate.on{display:flex}
+#rotate.on{display:flex;cursor:pointer}
+#rotate .rhint{font-size:11px;color:#6d7684;letter-spacing:.08em;margin-top:2px}
 #rotate .ph{width:62px;height:100px;border:5px solid var(--yel);border-radius:9px;
   position:relative;animation:tiltPhone 2.2s ease-in-out infinite}
 #rotate .ph:after{content:"";position:absolute;left:50%;bottom:7px;transform:translateX(-50%);
@@ -484,9 +485,10 @@ h1.logo em{font-style:normal;color:var(--yel);display:block}
   <div class="rt">请横屏游玩</div>
   <div class="rs">把手机转过来就行<br>点下面的按钮也能自动转</div>
   <div class="rbtns">
-    <button id="rotbtn">自动横屏</button>
-    <button id="rotskip">就这样玩</button>
+    <button id="rotbtn" onclick="window.__POW_LOCK&&window.__POW_LOCK()">自动横屏</button>
+    <button id="rotskip" onclick="window.__POW_SKIP&&window.__POW_SKIP()">就这样玩</button>
   </div>
+  <div class="rhint">点屏幕任意位置也能关掉·5 秒后自动进入</div>
 </div>
 
 <div id="boot">
@@ -500,6 +502,18 @@ h1.logo em{font-style:normal;color:var(--yel);display:block}
    POW! ARCHER — 爆裂弓箭手
    单文件 / 程序化几何 / 零外部素材
    ══════════════════════════════════════════════════════════ */
+/* 带 ?debug 打开时，把 JS 错误直接打在页面上，
+   方便手机上截图反馈。正常访问不会有任何影响。 */
+if(location.search.indexOf('debug') >= 0){
+  window.onerror = function(msg, src, line, col){
+    var d = document.createElement('div');
+    d.style.cssText = 'position:fixed;left:0;top:0;right:0;z-index:99999;background:#c00018;' +
+      'color:#fff;font:12px/1.5 monospace;padding:8px;white-space:pre-wrap;word-break:break-all';
+    d.textContent = '[ERR] ' + msg + '\n@' + line + ':' + col;
+    document.body.appendChild(d);
+  };
+}
+
 (function(){
 'use strict';
 
@@ -3091,6 +3105,7 @@ function isPortraitNow(){
 }
 
 var orientTimers = [];
+var orientAutoTimer = null;
 function scheduleOrientCheck(){
   for(var i = 0; i < orientTimers.length; i++) clearTimeout(orientTimers[i]);
   orientTimers = [60, 180, 420, 850].map(function(ms){
@@ -3109,8 +3124,17 @@ function checkOrient(){
          否则玩家转个屏回来发现血掉了一半 */
       if(S.mode === 'play'){ ORIENT.pausedByRotate = true; S.mode = 'pause'; }
       if(BGM && BGM.isPlaying && BGM.isPlaying()) BGM.pause();
+      /* 最后一道保险：5 秒后自动放行。
+         即使按钮绑定、内联 onclick、遮罩点击全部失效，
+         玩家也不会被困在这个层里。 */
+      if(orientAutoTimer) clearTimeout(orientAutoTimer);
+      orientAutoTimer = setTimeout(function(){
+        var box = document.getElementById('rotate');
+        if(box && box.classList.contains('on')) skipOrient();
+      }, 5000);
     }
   } else {
+    if(orientAutoTimer){ clearTimeout(orientAutoTimer); orientAutoTimer = null; }
     if(el.classList.contains('on')){
       el.classList.remove('on');
       if(ORIENT.pausedByRotate){
@@ -3148,12 +3172,30 @@ function tryLockLandscape(){
   });
 }
 
+function skipOrient(){
+  ORIENT.userSkip = true;
+  checkOrient();
+}
+
 function bindOrientUI(){
   var rb = document.getElementById('rotbtn');
   var rs = document.getElementById('rotskip');
-  if(rb) rb.onclick = function(){ tryLockLandscape(); };
-  if(rs) rs.onclick = function(){ ORIENT.userSkip = true; bindOrientUI();
-checkOrient(); };
+  var el = document.getElementById('rotate');
+
+  if(rb) rb.onclick = function(ev){ if(ev) ev.stopPropagation(); tryLockLandscape(); };
+  if(rs) rs.onclick = function(ev){ if(ev) ev.stopPropagation(); skipOrient(); };
+
+  /* 兜底一：遮罩任意位置都能点掉。
+     按钮万一失效，玩家点一下屏幕也能进去，不会卡死。 */
+  if(el) el.onclick = function(ev){
+    if(ev && ev.target && ev.target.tagName === 'BUTTON') return;
+    skipOrient();
+  };
+
+  /* 兜底二：挂到 window，HTML 内联 onclick 直接可用，
+     不依赖这段 JS 有没有执行到。 */
+  window.__POW_LOCK = tryLockLandscape;
+  window.__POW_SKIP = skipOrient;
 }
 
 addEventListener('resize', scheduleOrientCheck);
@@ -3169,6 +3211,8 @@ renderPickers();
 updateHUD();
 $('hud').classList.add('hide');
 
+/* 启动时绑定方向按钮，必须在 POW 导出之前 */
+bindOrientUI();
 checkOrient();
 
 window.POW = {
