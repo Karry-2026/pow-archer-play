@@ -482,6 +482,126 @@ body.is-title canvas#gl{
 .vrow input[type=range]::-moz-range-track{height:6px;background:#302b46;border-radius:3px}
 .vrow input[type=range]::-moz-range-thumb{width:15px;height:15px;border-radius:50%;
   background:var(--yel);border:3px solid var(--ink);cursor:pointer}
+
+/* ═══════════════════════════════════════════════════════════
+   矮屏适配（手机横屏 / 平板横屏）
+
+   为什么单独加这一段：之前所有断点都是 max-width，但这是个横屏游戏，
+   真正的约束是「高度」。844x390 的手机和 844x760 的桌面窄窗口
+   宽度完全一样，用宽度判断等于把两种设备混为一谈。
+   结果就是手机上按桌面布局压扁，角色卡名字都被裁没了。
+
+   这一段只做一件事：纵向空间不够时，把信息量减掉，而不是缩小。
+   ═══════════════════════════════════════════════════════════ */
+@media (max-height: 520px){
+
+  /* ── 标题页：两栏卡片 → 三行紧凑 ── */
+  #scr-title{padding:6px 12px; gap:0}
+  #scr-title .logo{font-size:32px;
+    text-shadow:2px 2px 0 var(--mag),5px 5px 0 var(--ink);
+    -webkit-text-stroke:3px var(--ink)}
+  #scr-title .sub{display:none}          /* 副标题在 390 高里不值那 26px */
+  #scr-title .hint{display:none}
+
+  .t-body{gap:8px; margin:5px 0; max-width:none; flex:1 1 auto}
+  .t-howto{display:none}                  /* 玩法速览是阅读内容，手机上折叠 */
+  .t-setup{flex:1 1 100%; padding:8px 12px; transform:none;
+    border-width:3px; box-shadow:5px 5px 0 var(--ink)}
+
+  .t-step{margin-bottom:6px; gap:6px}
+  .t-step + .t-step{margin-top:8px}
+  .t-step i{flex:0 0 19px; width:19px; height:19px; font-size:11px; border-width:2px}
+  .t-step b{font-size:13px; letter-spacing:.1em}
+  .t-step s{font-size:10px; margin-left:6px}
+
+  .pickrow{gap:7px}
+  .pick{padding:6px 9px; gap:8px; border-width:3px; box-shadow:3px 3px 0 var(--ink)}
+  .pick.on{box-shadow:3px 3px 0 var(--mag)}
+  .pico{flex:0 0 28px; width:28px; height:28px; font-size:14px; border-width:2px}
+  .pick b{font-size:14px}
+  .pick s{font-size:10px; margin-top:2px; line-height:1.3}
+  .pick .tagline{font-size:8px; padding:0 4px; margin-top:3px}
+
+  .rate{gap:6px; margin-top:2px}
+  .rate button{padding:7px 4px; font-size:12px; border-width:2px;
+    box-shadow:2px 2px 0 var(--ink)}
+
+  .startbig{font-size:20px; padding:8px 40px; margin-top:7px;
+    border-width:4px; box-shadow:5px 5px 0 var(--ink)}
+  #scr-title .startbig{animation:none}
+
+  /* ── 音频控件：矮屏只留静音图标，音量面板收进暂停菜单 ── */
+  #audiobox{left:auto; right:10px; top:8px; flex-direction:row; gap:5px}
+  #mutebtn{width:32px; height:32px; border-width:2px; border-radius:7px;
+    box-shadow:3px 3px 0 rgba(10,10,18,.6)}
+  #mutebtn svg{width:18px; height:18px}
+  #volbtn{display:none}
+  #volpanel{display:none !important}
+
+  /* ── HUD：压缩所有控件，并把上半区让开音频图标 ── */
+  .hud-top{padding:6px 10px; gap:6px}
+  .hud-left{width:min(190px,30vw)}
+  .hpwrap{padding:3px 5px; border-width:3px; box-shadow:3px 3px 0 rgba(10,10,18,.4)}
+  .hpwrap .row{margin-bottom:2px}
+  .hpwrap .row b{font-size:11px}
+  .hpwrap .row span{font-size:10px}
+  .hpbar{height:9px; border-width:2px}
+
+  .timerbox{padding:3px 11px; border-width:3px; box-shadow:3px 3px 0 rgba(10,10,18,.5)}
+  .timerbox b{font-size:19px}
+  .timerbox s{font-size:8px; letter-spacing:.14em}
+  .hud-mid{gap:5px}
+  .wavebar{width:min(210px,28vw)}
+  .wavebar .track{height:7px; border-width:2px}
+  .wavebar .lbl{font-size:9px; padding:1px 7px; margin-top:3px}
+
+  /* 等级/击杀那块下移，避开右上角的静音图标 */
+  .hud-right{padding-top:38px; gap:6px}
+  .lvbadge{font-size:15px; padding:2px 9px}
+  .kills{font-size:10px}
+
+  /* 底部：背包按钮、武器槽、经验条一起收 */
+  #bagbtn{font-size:11px; padding:4px 13px}
+  #slots{gap:5px}
+  .slot{width:34px; height:34px}
+  .xpwrap{padding:0 8px}
+  .xpbar{height:10px; border-width:2px}
+}
+
+/* 更矮的（部分安卓机 360 高）：再砍一档 */
+@media (max-height: 400px){
+  #scr-title .logo{font-size:27px}
+  .t-setup{padding:6px 9px}
+  .pickrow{gap:6px}
+  .pick{padding:5px 7px}
+  .pico{flex:0 0 24px; width:24px; height:24px; font-size:12px}
+  .pick b{font-size:13px}
+  .pick s{font-size:9px}
+  .pick .tagline{display:none}
+  .startbig{font-size:18px; padding:7px 34px}
+}
+
+/* 矮屏补充：升级页与经验条 */
+@media (max-height: 520px){
+  /* 升级三选一：卡片纵向压扁，否则「重掷」按钮会被挤出屏幕 */
+  #scr-level{gap:6px; padding:6px 10px}
+  .lvlhead{font-size:24px; -webkit-text-stroke:4px var(--ink); text-shadow:4px 4px 0 var(--ink)}
+  .lvlhead s{font-size:10px; margin-top:2px}
+  #cards{gap:8px}
+  .card{padding:7px 9px}
+  .card .ic{font-size:17px; padding:5px 0}
+  .card .kd{font-size:8px; margin-top:2px}
+  .card .nm{font-size:14px; margin-top:1px}
+  .card .gain{font-size:16px; margin-top:3px}
+  .card .ds{font-size:10px; margin-top:3px; min-height:0; line-height:1.35}
+  #rerollbtn{font-size:11px; letter-spacing:.1em; padding:4px 16px; border-width:3px;
+    box-shadow:3px 3px 0 rgba(10,10,18,.7)}
+
+  /* 经验条：16px 高 + 文字会在 390 高里被底边裁掉，压薄 */
+  .xpwrap{padding:0}
+  .xpbar{height:13px; border-top-width:3px}
+  .xpbar span{font-size:9px; letter-spacing:.1em}
+}
 </style>
 </head>
 <body class="is-title">
@@ -851,7 +971,14 @@ buildArena();
           画面相对玩家滑动，体感就是抽搐。
    硬跟随下玩家在屏幕上的位置绝对固定，只有世界在滚动。 */
 function updateCamera(dt, px, pz){
+  /* 矮屏（手机横屏）视野窄，用同样的机位角色会小得看不清。
+     按可用高度把相机拉近：390 高的手机大概拉到 19/13。 */
   var camH = 24, camZ = 16.5;
+  if(innerHeight < 520){
+    var k = Math.max(0.72, Math.min(1, innerHeight / 760));
+    camH = 24 * (0.78 + 0.22*k);
+    camZ = 16.5 * (0.78 + 0.22*k);
+  }
 
   // 震屏
   var sx = 0, sy = 0, sz = 0;
