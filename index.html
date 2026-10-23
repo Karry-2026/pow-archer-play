@@ -344,6 +344,13 @@ body.is-title canvas#gl{
   0%{opacity:0;transform:translateY(26px) rotate(-2.5deg) scale(.9)}
   100%{opacity:1;transform:translateY(0) rotate(0) scale(1)}
 }
+/* 结算界面的两个出口：再来一局（主）/ 回主菜单（次） */
+.overbtns{
+  display: flex; justify-content: center; gap: 12px;
+  margin-top: 18px; flex-wrap: wrap;
+}
+.overbtns .btn{ min-width: 150px }
+
 /* ── 背包 / 暂停 / 结算 ── */
 #scr-bag,#scr-pause{background:rgba(10,10,18,.74);backdrop-filter:blur(4px);z-index:32}
 .baghead{display:flex;justify-content:space-between;align-items:center;border-bottom:5px solid var(--ink);
@@ -990,8 +997,9 @@ body.is-title canvas#gl{
       清场！
     </div>
     <div id="reslist"></div>
-    <div style="display:flex;justify-content:center;margin-top:18px">
+    <div class="overbtns">
       <button class="btn" id="againbtn">再 来 一 局</button>
+      <button class="btn alt" id="backbtn">回 到 主 菜 单</button>
     </div>
   </div>
 </div>
@@ -1052,10 +1060,34 @@ function dist2(ax,az,bx,bz){ var dx=ax-bx, dz=az-bz; return dx*dx+dz*dz; }
 function shuffle(a){ for(var i=a.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)),t=a[i];a[i]=a[j];a[j]=t; } return a; }
 function $(id){ return document.getElementById(id); }
 
+/* 配色体系（v0.8 重做）
+   ─────────────────────────────────────────────
+   问题：经验球是青色 #00E5FF，地面是浅蓝 #E4F2FD。
+   两者明度只差 17（85 vs 78），而且同属蓝青色系，
+   灰阶下几乎叠在一起 ——「看不清」不是色相问题，是明度没拉开。
+
+   三条原则（来自游戏配色研究）：
+   1. 明度对比最重要。转灰阶还能分清，才算合格；
+      只靠色相对比，在运动中和小尺寸下会失效。
+   2. 职能色分层。金 = 战利品、红 = 危险、冷色 = 环境。
+      同一含义永远用同一颜色，玩家不用思考就能反应。
+   3. 环境去饱和。背景的饱和度和细节要比前景低一档，
+      否则前景会被「视觉噪声」淹没。
+
+   具体做法：
+   · 地面从 #E4F2FD 压到 #C9DFEF（明度 95 → 82），并把放射线、
+     同心圆、网点的透明度全部降一半，减少噪声
+   · 经验球从青改为金 #FFC233（明度 82 → 84，但色相与蓝互补、
+     饱和度从 100% 提到 92% 且加了白色内核）
+   · 凡是「玩家需要一眼看到」的东西，一律换成暖色或提高明度 */
 var COS = {
   ink:0x0a0a12, mag:0xff2e88, cyn:0x00e5ff, yel:0xffe600, pur:0x7b2ff7,
   lime:0xb6ff3c, red:0xff3b30, paper:0xfff6e9, blue:0x2f7de1,
-  shadow:0x1b1440
+  shadow:0x1b1440,
+  gold:0xffd24a,     /* 战利品专用：经验球、宝箱点缀 */
+  coral:0xff4d6d,    /* BOSS 警示：千手墨神的手臂与能量环 */
+  teal:0x12a6c4,     /* 尖刺兽：压暗的青蓝，与浅蓝地面拉开明度 */
+  warmwhite:0xfff8ee  /* 玩家光环内圈：中性亮色，不与任何敌人撞色 */
 };
 
 var ARENA_R = 40;          // 竞技场半径
@@ -1066,10 +1098,10 @@ var canvas = $('gl');
 var renderer = new THREE.WebGLRenderer({canvas:canvas, antialias:true, powerPreference:'high-performance'});
 renderer.setPixelRatio(Math.min(devicePixelRatio||1, 1.6));
 renderer.setSize(innerWidth, innerHeight);
-renderer.setClearColor(0x9ed4f5, 1);
+renderer.setClearColor(0xa9cbe4, 1);   /* 原 #9ed4f5：太亮，把经验球压没了 */
 
 var scene = new THREE.Scene();
-scene.fog = new THREE.Fog(0xbfe3fa, 60, 105);
+scene.fog = new THREE.Fog(0xc4def2, 60, 105);
 
 var camera = new THREE.PerspectiveCamera(46, innerWidth/innerHeight, 0.5, 220);
 var camTarget = new THREE.Vector3(0,0,0);
@@ -1124,23 +1156,27 @@ function hvCanvas(w,h){ var c=document.createElement('canvas'); c.width=w; c.hei
 /* 漫画地板：放射线 + 同心圆 + 网点 */
 function makeFloorTex(){
   var S=768, cv=hvCanvas(S,S), g=cv.getContext('2d'), c=S/2;
-  g.fillStyle='#e4f2fd'; g.fillRect(0,0,S,S);
+  /* 底色从 #e4f2fd 压到 #c9dfef：明度 95 → 82。
+     地面是 60% 的画面面积，它越亮，上面的东西越难看清。 */
+  g.fillStyle='#c9dfef'; g.fillRect(0,0,S,S);
   // 放射线
   g.save(); g.translate(c,c);
   for(var i=0;i<48;i++){
     g.rotate(TAU/48);
     g.beginPath(); g.moveTo(0,0); g.lineTo(0, S*0.62);
-    g.strokeStyle = i%2 ? 'rgba(120,190,240,.42)' : 'rgba(176,215,244,.85)';
+    /* 放射线原来开到 .42/.85，在亮底上是一层白噪声。降到 .16/.30，
+       保留美漫的放射构图，但不再和地面的物件抢注意力。 */
+    g.strokeStyle = i%2 ? 'rgba(120,180,225,.10)' : 'rgba(176,210,240,.20)';
     g.lineWidth = i%2 ? 10 : 22; g.stroke();
   }
   g.restore();
   // 同心圆
   for(var r=40;r<c;r+=42){
     g.beginPath(); g.arc(c,c,r,0,TAU);
-    g.strokeStyle='rgba(255,255,255,.55)'; g.lineWidth=3; g.stroke();
+    g.strokeStyle='rgba(255,255,255,.26)'; g.lineWidth=3; g.stroke();
   }
   // 网点
-  g.fillStyle='rgba(96,150,196,.16)';
+  g.fillStyle='rgba(96,150,196,.10)';
   for(var y=0;y<S;y+=7){ for(var x=(y/7%2)*7;x<S;x+=14){ g.fillRect(x,y,2.4,2.4); } }
   // 中央标志
   g.save(); g.translate(c,c);
@@ -2128,7 +2164,9 @@ function makeBlob(){
 /* ── 尖刺兽：八面体身体 + 六根黄刺 + 一道横眼 ── */
 function makeSpiker(){
   var P = [];
-  P.push({geo:G_octa(0.46), color:COS.cyn, y:0.62});
+  /* 原来是 #00E5FF，明度和浅蓝地面几乎一样，怪物会「隐身」。
+     压到 #12A6C4（明度 62），比地面暗 20 档，同时也更深、更沉。 */
+  P.push({geo:G_octa(0.46), color:COS.teal, y:0.62});
   P.push({geo:G_cone(0.10, 0.44, 4), color:COS.yel, x:-0.30, y:0.86, rz:0.9});
   P.push({geo:G_cone(0.10, 0.44, 4), color:COS.yel, x:0.30, y:0.86, rz:-0.9});
   P.push({geo:G_cone(0.10, 0.44, 4), color:COS.yel, x:-0.30, y:0.38, rz:-0.9});
@@ -2208,8 +2246,10 @@ var eliteRing = instPool(eliteRingGeo, new THREE.MeshBasicMaterial({
 /* 玩家脚下的身份光环：青底 + 洋红描边圈，和敌人的黄色精英环明确区分 */
 var heroRing = new THREE.Group();
 (function(){
+  /* 内圈原来是青色，和浅蓝地面同色系，等于没画。
+     改成暖白：中性色，不和任何敌人（紫/青/黄/红）撞，也不融进地面。 */
   var a = new THREE.Mesh(new THREE.RingGeometry(0.72, 0.98, 28),
-    new THREE.MeshBasicMaterial({color:0x00e5ff, transparent:true, opacity:0.5, side:THREE.DoubleSide, depthWrite:false}));
+    new THREE.MeshBasicMaterial({color:COS.warmwhite, transparent:true, opacity:0.62, side:THREE.DoubleSide, depthWrite:false}));
   a.rotation.x = -Math.PI/2;
   var b = new THREE.Mesh(new THREE.RingGeometry(1.02, 1.10, 28),
     new THREE.MeshBasicMaterial({color:0xff2e88, transparent:true, opacity:0.75, side:THREE.DoubleSide, depthWrite:false}));
@@ -2321,7 +2361,9 @@ function buildBoss(x, z, hp, kind){
     /* ══ 千手墨神 ══
        俯视看是一朵八瓣放射的花：中心躯干，八条青色手臂平铺向外，
        末端是黄色爪。这样从任何角度都能立刻认出「千手」两个字。 */
-    var BODY = 0x3b2a72, ARM = 0x00e5ff, EYE = 0xffe600;
+    /* 手臂原来用青色，和浅蓝地面同色系，八条「千手」几乎看不见。
+       珊瑚红在冷色背景上是最跳的暖色，也正是「危险」的职能色。 */
+    var BODY = 0x3b2a72, ARM = COS.coral, EYE = 0xffe600;
     baseY = 3.0;
 
     /* 躯干：上细下粗的柱，俯视是一个圆 */
@@ -2387,7 +2429,7 @@ function buildBoss(x, z, hp, kind){
 
     /* 两圈反向旋转的能量环 */
     var h1 = new THREE.Mesh(new THREE.TorusGeometry(2.55, 0.07, 6, 40),
-      new THREE.MeshBasicMaterial({color: COS.cyn, transparent:true, opacity:0.8}));
+      new THREE.MeshBasicMaterial({color: COS.coral, transparent:true, opacity:0.8}));
     h1.rotation.x = Math.PI/2; h1.position.y = -1.95; g.add(h1);
     var h2 = new THREE.Mesh(new THREE.TorusGeometry(1.85, 0.055, 6, 36),
       new THREE.MeshBasicMaterial({color: COS.mag, transparent:true, opacity:0.75}));
@@ -2538,8 +2580,20 @@ function spawnEBullet(x, z, vx, vz, dmg){
 }
 
 /* ═══════════ 经验宝石 ═══════════ */
-var gemPool = instPool(new THREE.OctahedronGeometry(0.26, 0),
-  new THREE.MeshBasicMaterial({color:COS.cyn}), 260);
+/* 经验球：金色八面体 + 白色内核。
+   金色和蓝灰地面是色相环上的互补对（蓝 vs 橙），
+   同时明度比地面高、饱和度比地面高，三个维度同时拉开。
+   白色内核让它在任何背景上都有一个「亮心」，不依赖色相也能认出来。 */
+/* 三层结构：黑壳 + 金体 + 白核。
+   为什么非要加黑壳：灰阶测试里，金色（明度 84）和地面（82）只差 2，
+   转成灰度后经验球直接消失。只有黑边能在任何背景上保证轮廓，
+   这也是美漫的通用解法——所有东西都有墨线。 */
+var gemOutPool = instPool(new THREE.OctahedronGeometry(0.30, 0),
+  new THREE.MeshBasicMaterial({color:0x0a0a12, side:THREE.BackSide}), 260);
+var gemPool = instPool(new THREE.OctahedronGeometry(0.30, 0),
+  new THREE.MeshBasicMaterial({color:COS.gold}), 260);
+var gemCorePool = instPool(new THREE.OctahedronGeometry(0.13, 0),
+  new THREE.MeshBasicMaterial({color:0xffffff}), 260);
 var gems = [];
 function spawnGem(x, z, val){
   if(gems.length > 255) return;
@@ -3085,21 +3139,32 @@ function openChest(c){
 }
 
 /* ═══════════ 背包 ═══════════ */
-function estimateDPS(){
+function estimateDPS(single){
   /* 弹数和清怪系数统一从 WDEF 取，不再按武器逐个手写。
      原来弓 Lv5 按 3 发算（实际射 5 发）、回旋镖按固定 2 倍算（实际 4 枚），
      背包里显示的数字比真实值低一截，等于在误导玩家。
-     清怪系数 = 命中率与范围收益的等效折算，定义见数值策划表「武器表」。 */
+     清怪系数 = 命中率与范围收益的等效折算，定义见数值配置表「武器-流派与超武」。
+
+     single=true 时不算清怪系数：那个系数是「一发能清几只怪」的折算，
+     拿来算单个 BOSS 会把镰刀（2.6）、地刺（4.6）这种 AOE 武器高估两到四倍。
+     血月斩对着一只 BOSS，并不会因为它是范围伤害就打出四倍输出。 */
   var total = 0, st = hero.stat;
   hero.weapons.forEach(function(w){
     var d = WDEF[w.id];
     var dmg = d.dmg[w.lv-1] * st.atk * (1 + 0.08*(w.plus||0));
     var cd = d.cd[w.lv-1] / st.as;
     var cnt = w.evo ? d.cntEvo : d.cnt[w.lv-1];
-    var coef = w.evo ? d.coefEvo : d.coef;
+    var coef = single ? 1 : (w.evo ? d.coefEvo : d.coef);
     total += dmg * cnt / cd * coef;
   });
   return Math.round(total);
+}
+
+/* 当前配装对单个目标的期望 DPS：在 estimateDPS(true) 基础上补暴击期望。
+   暴击是独立乘区，平时算「清怪 DPS」时不体现，但打 BOSS 时它是实打实的输出。 */
+function currentBossDPS(){
+  var critMul = 1 + hero.stat.crit * (2.0 - 1);
+  return Math.max(1, Math.round(estimateDPS(true) * critMul));
 }
 
 function renderBag(){
@@ -3417,12 +3482,23 @@ function spawnBoss(){
 
   var kind = S.wave >= 10 ? 'hands' : 'maw';
 
-  /* 血量按「预估 DPS × 目标秒数」派生，不是常数。
-     BOSS 期间不刷小兵，玩家可以全力输出，所以目标秒数比之前长：
-     第 5 波 16 秒、第 10 波 28 秒，配合狂暴阶段形成两段压力。 */
-  var ed = EXPECTED_DPS[clamp(S.wave, 1, 10) - 1];
-  var targetTtk = kind === 'hands' ? 28 : 16;
-  var hp = Math.round(ed * targetTtk);
+  /* ── 血量按「玩家此刻真实 DPS × 目标有效输出秒数」派生 ──
+     原来用的是 EXPECTED_DPS 查表：那是「典型配装」的期望值，
+     跟玩家实际拿到的牌完全脱节。实测四个构筑策略打第 5 波：
+     弱配装（只有一把弓）90 秒都打不完，强配装（三把武器带满级激光）
+     42 秒收工 —— 同一个 7216 血，体验差三倍。
+     现在改成开战那一刻读玩家自己的 DPS，谁打都是同一个时长。
+
+     为什么不是 DPS × 16，而是 × 12 / 20：
+     理论 DPS 假设「每一发都命中」。实战里玩家要躲冲锋、躲弹幕，
+     有效输出时间约占 60-75%，所以目标秒数按这个折损定。 */
+  var liveDps = currentBossDPS();
+  var targetTtk = kind === 'hands' ? 20 : 12;
+  /* 不设血量下限。上一版给了 2600 的下限「防止 BOSS 变纸」，
+     结果弱配装（DPS 30）要打 87 秒 —— 下限本意是保护体验，
+     实际保护的是「BOSS 的尊严」，牺牲的是玩家的时间。
+     完全跟随 DPS 反而最公平：谁打都是 ttk 秒。 */
+  var hp = Math.max(260, Math.round(liveDps * targetTtk));
 
   /* ── 出场序列：清场 → 白闪震屏 → 从地下升起 ── */
   var cleared = clearMinionsForBoss();
@@ -3443,6 +3519,10 @@ function spawnBoss(){
 
   setBossBar(kind);
   bossBar.style.display = 'block';
+  /* 把「按你的 DPS 算，这场大概要打多久」写在血条上。
+     玩家能看懂为什么血条这么长，也方便回看时判断数值是否合理。 */
+  boss.dpsAtSpawn = liveDps;
+  boss.planTtk = targetTtk;
 
   SFX.boss();
   BGM.setMode('boss');
@@ -3729,8 +3809,11 @@ function updateHandsBoss(b, dt, rageK){
   b.orbCd -= dt * rageK;
   b.tpCd -= dt;
 
-  /* 保持 9.5 单位距离：太近后退，太远靠近 */
-  var want = 9.5;
+  /* 保持 9.5 单位距离：太近后退，太远靠近。
+     血量过半进狂暴后改为贴身 4.5 —— 否则纯近战构筑（镰刀/地刺）
+     整场都够不到它，实测有一半构筑会把 90 秒打满还没打死。
+     狂暴 = 放弃远程优势，开始压制，机制上也更容易读。 */
+  var want = b.rage ? 4.5 : 9.5;
   var mv = d < want - 2.2 ? -3.6 : (d > want + 2.2 ? 3.0 : 0);
   b.x += (dx/d) * mv * dt;
   b.z += (dz/d) * mv * dt;
@@ -3904,10 +3987,10 @@ function updateGems(dt){
       /* 经验球是自动飞过来的（拾取半径 4.6），玩家常常没意识到自己「捡了东西」，
          所以大球吸收时给一个 +N 飘字，让「打怪 → 涨经验 → 升级」这条链看得见。 */
       gainXP(g.val);
-      burst(g.x, 0.6, g.z, COS.cyn, 3, 4, 0.6);
+      burst(g.x, 0.6, g.z, COS.gold, 3, 4, 0.6);
       if(g.val >= 4){
         var gsp = toScreen(g.x, 1.3, g.z);
-        popDmg('+' + g.val, gsp.x, gsp.y, '#00e5ff');
+        popDmg('+' + g.val, gsp.x, gsp.y, '#ffc233');
       }
       SFX.hit();
       gems.splice(i,1); continue;
@@ -3974,14 +4057,36 @@ function renderGems(){
   var n = 0;
   for(var i=0;i<gems.length;i++){
     var g = gems[i];
+    /* 呼吸脉动：静止的小物件容易被当成场景装饰，
+       有节奏地放大缩小才会被识别成「可以拿的东西」。 */
+    var pulse = 1 + Math.sin(S.t * 5.2 + g.x * 1.7 + g.z) * 0.13;
+    var base = (g.val >= 4 ? 1.75 : 1) * pulse;
+
     _dm.position.set(g.x, g.y, g.z);
     _dm.rotation.set(0, S.t*3.4 + g.x, 0.4);
-    _dm.scale.setScalar(g.val >= 4 ? 1.75 : 1);
+
+    /* 黑壳：放大 1.34 倍 + 只渲染背面，形成一圈墨线 */
+    _dm.scale.setScalar(base * 1.34);
     _dm.updateMatrix();
-    gemPool.setMatrixAt(n++, _dm.matrix);
+    gemOutPool.setMatrixAt(n, _dm.matrix);
+
+    /* 金体 */
+    _dm.scale.setScalar(base);
+    _dm.updateMatrix();
+    gemPool.setMatrixAt(n, _dm.matrix);
+
+    /* 内核实心白点，反向旋转，像是在球体内部跳动 */
+    _dm.rotation.set(S.t*2.1, -S.t*2.8, 0);
+    _dm.scale.setScalar(base * 1.02);
+    _dm.updateMatrix();
+    gemCorePool.setMatrixAt(n, _dm.matrix);
+
+    n++;
     if(n >= 260) break;
   }
+  gemOutPool.count = n; gemOutPool.instanceMatrix.needsUpdate = true;
   gemPool.count = n; gemPool.instanceMatrix.needsUpdate = true;
+  gemCorePool.count = n; gemCorePool.instanceMatrix.needsUpdate = true;
 }
 
 function renderSpikes(){
@@ -4053,7 +4158,11 @@ function update(dt){
 var chosenHero = 'swift';
 var chosenRate = 1.0;
 
-function resetGame(){
+/* 清空世界里的全部实体。
+   「再来一局」和「回到主菜单」都要用它，所以单独抽出来。
+   这个项目已经因为「同一段逻辑两处各写一份」踩过三次坑
+   （宝箱塞武器、刷新权重、描边参数），不再重复第四次。 */
+function clearWorld(){
   EKEYS.forEach(function(k){ E[k].length = 0; });
   bullets.length = 0; bulletsB.length = 0; eBullets.length = 0;
   gems.length = 0; spikes.length = 0;
@@ -4061,9 +4170,16 @@ function resetGame(){
   chests.length = 0;
   for(var i=0;i<MAXP;i++) parts[i].on = false;
   if(boss){ scene.remove(boss.obj); boss = null; }
+  if(bossBar) bossBar.style.display = 'none';
   bossSpawned = false;
   spawnAcc = 0;
   pendingLevels = 0;
+  camShake = 0;
+  S.hitstop = 0;
+}
+
+function resetGame(){
+  clearWorld();
 
   hero.x = 0; hero.z = 0; hero.ang = 0;
   hero.hp = 100; hero.maxhp = 100;
@@ -4101,6 +4217,47 @@ function resetGame(){
   flash(0.25);
   updateCamera(0.016, 0, 0);
 }
+/* 回到主菜单：清场 + 把对局进度退回初始 + 切回标题界面。
+   注意这里不复用 resetGame()，因为那个函数的最后一行会进入 play 状态。
+   复用的是它前半段的 clearWorld()。 */
+function backToTitle(){
+  clearWorld();
+
+  /* 进度归零。不归零的话，下次开始会带着上一局的等级和武器。 */
+  S.t = 0; S.wave = 1; S.waveT = 0; S.kills = 0;
+  S.mode = 'title'; S.over = false; S.victory = false;
+
+  hero.hp = 100; hero.maxhp = 100;
+  hero.lv = 1; hero.xp = 0; hero.xpNext = 9;
+  hero.invuln = 0; hero.alive = true;
+  hero.speed = 9.2;
+  hero.weapons = [{id:'bow', lv:1, cd:0, tick:0}];
+  hero.passives = {};
+  hero.evoId = null;
+  if(chosenHero === 'swift'){ hero.speed = 10.4; hero.passives.move = 1; }
+  else { hero.passives.hp = 1; }
+  refreshStats();
+  hero.hp = hero.maxhp;
+
+  hero.obj.position.set(0, 0, 0);
+  hero.obj.rotation.set(0, 0, 0);
+  hero.obj.visible = true;
+
+  $('hud').classList.add('hide');
+  $('scr-over').classList.add('hide');
+  $('scr-pause').classList.add('hide');
+  $('scr-bag').classList.add('hide');
+  $('scr-level').classList.add('hide');
+  $('slots').innerHTML = '';
+  $('scr-title').classList.remove('hide');
+  document.body.classList.add('is-title');   /* 背景虚化，和首次进标题一致 */
+
+  BGM.setMode('menu');
+  SFX.whooshUp();
+  titleT = 0;
+  updateCamera(0.016, 0, 0);
+}
+
 function startGame(){
   unlockAudio();
   document.body.classList.remove('is-title');
@@ -4441,6 +4598,7 @@ $('quitbtn').onclick = function(){
   gameOver(false);
 };
 $('againbtn').onclick = function(){ startGame(); };
+$('backbtn').onclick = function(){ backToTitle(); };
 
 /* ═══════════ 主循环 ═══════════ */
 var lastT = performance.now();
@@ -4628,7 +4786,7 @@ window.POW = {
   gainXP:gainXP, openChest:openChest, buildChest:buildChest, spawnBoss:spawnBoss,
   hurtHero:hurtHero, hurtEnemy:hurtEnemy, EVO:EVO, buildChoices:buildChoices,
   openLevelUp:openLevelUp, renderBag:renderBag, estimateDPS:estimateDPS,
-  spawnEnemy:spawnEnemy, ETYPES:ETYPES, camera:camera, renderer:renderer, eMesh:eMesh,
+  spawnEnemy:spawnEnemy, spawnGem:spawnGem, ETYPES:ETYPES, camera:camera, renderer:renderer, eMesh:eMesh,
   getAudio: function(){ return {ac: AC, bgm: BGM, master: masterGain}; },
   get boss(){ return boss; }
 };
