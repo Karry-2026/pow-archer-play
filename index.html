@@ -1626,7 +1626,11 @@ function renderEnemies(){
       }
       _dm.position.set(e.x, e.y + bob, e.z);
       _dm.rotation.set(0, e.ang, 0);
-      if(key === 'spiker') _dm.rotation.x = e.phase;
+      /* 坑：原来这里是 _dm.rotation.x = e.phase，而 phase 是 0~2π 的随机角。
+         转到 90° 就横躺、180° 就完全倒立，整个模型沉到地板以下，
+         俯视只能看到地面上那个独立的贴地阴影——就是「怪隐形了，只剩阴影」。
+         改成小幅摆动：保留一点翻滚的动感，但幅度锁在 ±8°，永远不会翻倒。 */
+      if(key === 'spiker') _dm.rotation.x = Math.sin(S.t*6 + e.phase) * 0.14;
       _dm.scale.setScalar(hs);
       _dm.updateMatrix();
       m.body.setMatrixAt(n, _dm.matrix);
