@@ -847,7 +847,7 @@ body.is-title canvas#gl{
   </button>
   <button id="volbtn">音量</button>
   <div id="volpanel" class="hide">
-    <div class="vrow"><span>音乐</span><input type="range" id="volbgm" min="0" max="100" value="28"><b id="volbgmv">28</b></div>
+    <div class="vrow"><span>音乐</span><input type="range" id="volbgm" min="0" max="100" value="21"><b id="volbgmv">21</b></div>
     <div class="vrow"><span>音效</span><input type="range" id="volsfx" min="0" max="100" value="55"><b id="volsfxv">55</b></div>
   </div>
 </div>
@@ -1465,7 +1465,9 @@ var SFX = {
 */
 var BGM = (function(){
   var g = null, playing = false, paused = false, mode = 'menu';
-  var vol = 0.28, muted = false;
+  /* 0.28 → 0.21：低音改成持续包络、铺底不从零起音之后，
+     同样音量下内容响度涨了约 86%，不降回来会盖住射击音效。 */
+  var vol = 0.21, muted = false;
   var step = 0, nextTime = 0, timer = null, noiseBuf = null;
 
   /* ── 三首曲子的骨架 ── */
@@ -1474,7 +1476,11 @@ var BGM = (function(){
       bpm: 82, bars: 8, kit: 'soft',
       /* Am9 · Fmaj7 · Cmaj7 · G6，比三和弦更柔，适合当背景 */
       chords: [[57,60,64,67], [53,57,60,64], [48,52,55,59], [55,59,62,66]],
-      sec:    ['intro','intro','a','a','b','b','a','outro']
+      /* 循环点两侧是 outro + intro 两个过渡小节。
+         原来是 intro×2 + outro 共 3 小节只剩一条 pad 长音，
+         等于每轮循环有 8.8 秒没有节奏，听感上就是「音乐断了又重新开始」。
+         现在前奏压到 1 小节，且两个过渡段都保留低音和踩镲。 */
+      sec:    ['intro','a','a','b','b','a','b','outro']
     },
     battle: {
       bpm: 134, bars: 16, kit: 'full',
@@ -1496,15 +1502,40 @@ var BGM = (function(){
      lead  0 无 / 1 中音区 / 2 高音区
      kick  1 每半小节 / 2 每拍+反拍
      snare 1 二四拍 / 2 反拍密集
-     hat   1 八分 / 2 四分 */
+     hat   1 八分 / 2 四分
+
+     ⚠ 一条硬规则：任何段落都必须至少有 bass 或 hat 在响。
+     节奏声部一旦清零，听感不是「变安静」而是「音乐断了」——
+     因为低频脉冲和踩镲是听众用来判断「歌还在不在」的锚点。
+     「薄」和「空」是两回事：薄是减声部，空是没了脉搏。
+     v0.7 的 intro/outro 全填 0，导致每轮循环有 3 小节没有节奏，
+     用户听到的就是「戛然而止，然后播第二段」。 */
   var SEC = {
-    intro: {bass:0, arp:0,  lead:0, pad:1, kick:0, snare:0, hat:0, crash:0},
+    /* 前奏：只有低音根音 + 四分踩镲 + 铺底，最薄但脉搏在 */
+    intro: {bass:1, arp:0,  lead:0, pad:1, kick:0, snare:0, hat:2, crash:0},
     a:     {bass:1, arp:8,  lead:0, pad:1, kick:1, snare:0, hat:2, crash:0},
     b:     {bass:1, arp:8,  lead:1, pad:1, kick:1, snare:1, hat:2, crash:0},
     c:     {bass:2, arp:16, lead:2, pad:1, kick:2, snare:2, hat:1, crash:1},
-    d:     {bass:1, arp:0,  lead:0, pad:1, kick:1, snare:0, hat:2, crash:0},
-    outro: {bass:0, arp:0,  lead:0, pad:1, kick:0, snare:0, hat:0, crash:0}
+    d:     {bass:1, arp:6,  lead:0, pad:1, kick:1, snare:0, hat:2, crash:0},
+    /* 尾奏：低音 + 分解 + 踩镲，去掉底鼓和军鼓，比主歌薄一档 */
+    outro: {bass:1, arp:8,  lead:0, pad:1, kick:0, snare:0, hat:2, crash:0}
   };
+
+  /* 分解和弦的步位表：把「一小节发 N 次」翻译成具体的 16 分步位。
+     6 次用 0/3/5/8/11/13 这种不均分布，听起来像三连音，
+     比均匀的 8 分更松弛，适合尾奏段。 */
+  var ARP_SLOTS = {
+    8: mkSlots([0,2,4,6,8,10,12,14]),
+    16: mkSlots([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]),
+    6: mkSlots([0,3,5,8,11,13])
+  };
+  function mkSlots(steps){
+    var m = {};
+    for(var i=0;i<steps.length;i++){
+      m[steps[i]] = { idx: i, oct: (i % 2) ? 12 : 24 };
+    }
+    return m;
+  }
 
   /* 旋律：每小节 8 个八分音，null 是休止。按「小节在 4 小节里的位置」取 */
   var LEAD_MID = [
@@ -1543,15 +1574,22 @@ var BGM = (function(){
   /* ── 乐器 ── */
 
   /* 低音：锯齿过低通，比方波厚、比三角波有冲击力 */
+  /* 低音：锯齿过低通。
+     包络必须是「起音 → 保持 → 释放」三段，不能是起音后一路指数衰减。
+     原来写成 exponentialRampToValueAtTime(0.0008, t+dur)，
+     等于每个音「砰一下就没了」，低音只占时长的前 20%，
+     两个低音之间留 0.07 秒完全空白 —— 这是「音乐时断时续」的来源之一。
+     现在保持到 58% 时长再释放，低音变成一条连续的线。 */
   function bassNote(t, midi, dur, v){
     var o = AC.createOscillator(), f = AC.createBiquadFilter(), gn = AC.createGain();
     o.type = 'sawtooth';
     o.frequency.setValueAtTime(mtof(midi), t);
     f.type = 'lowpass';
-    f.frequency.setValueAtTime(460, t);
-    f.frequency.exponentialRampToValueAtTime(170, t + dur*0.85);
+    f.frequency.setValueAtTime(520, t);
+    f.frequency.exponentialRampToValueAtTime(190, t + dur*0.9);
     gn.gain.setValueAtTime(0, t);
-    gn.gain.linearRampToValueAtTime(v, t + 0.012);
+    gn.gain.linearRampToValueAtTime(v, t + 0.014);
+    gn.gain.linearRampToValueAtTime(v * 0.82, t + dur * 0.58);   // 保持段
     gn.gain.exponentialRampToValueAtTime(0.0008, t + dur);
     o.connect(f); f.connect(gn); gn.connect(g);
     o.start(t); o.stop(t + dur + 0.03);
@@ -1585,17 +1623,22 @@ var BGM = (function(){
     });
   }
 
-  /* 铺底：整小节长音，慢起音。把音符之间的缝隙填住，也是「不干」的来源 */
+  /* 铺底：整小节长音，把音符之间的缝隙填住，也是「不干」的来源。
+     两个细节决定它能不能真的「铺住」：
+     1. 不能从 0 起音。上一小节的 pad 已经衰减干净，这一小节如果从 0
+        爬坡，每小节开头就有 0.3 秒的真空 —— 表现为周期性「一顿一顿」。
+        现在从 45% 音量起，听感上是「接着上一小节」。
+     2. 时长要略长过一小节（调用方传 16.4 步），让相邻两个 pad 有重叠。 */
   function pad(t, chord, dur, v){
     chord.forEach(function(m, idx){
       var o = AC.createOscillator(), f = AC.createBiquadFilter(), gn = AC.createGain();
       o.type = 'triangle';
       o.frequency.setValueAtTime(mtof(m - 12), t);
-      f.type = 'lowpass'; f.frequency.value = 720;
+      f.type = 'lowpass'; f.frequency.value = 760;
       var pk = v * (0.92 - idx*0.11);
-      gn.gain.setValueAtTime(0, t);
-      gn.gain.linearRampToValueAtTime(pk, t + 0.32);
-      gn.gain.setValueAtTime(pk, t + dur*0.7);
+      gn.gain.setValueAtTime(pk * 0.45, t);
+      gn.gain.linearRampToValueAtTime(pk, t + 0.16);
+      gn.gain.setValueAtTime(pk, t + dur*0.72);
       gn.gain.exponentialRampToValueAtTime(0.0006, t + dur);
       o.connect(f); f.connect(gn); gn.connect(g);
       o.start(t); o.stop(t + dur + 0.06);
@@ -1669,18 +1712,21 @@ var BGM = (function(){
       var t     = nextTime;
 
       /* 铺底：每小节一次 */
-      if(sec.pad && s === 0) pad(t, ch, stepDur * 15.2, 0.075);
+      if(sec.pad && s === 0) pad(t, ch, stepDur * 16.4, 0.095);
 
       /* 低音 */
-      if(sec.bass === 1 && s % 4 === 0) bassNote(t, ch[0] - 12, stepDur * 3.6, 0.30);
-      else if(sec.bass === 2 && s % 2 === 0) bassNote(t, ch[0] - 12, stepDur * 1.7, 0.27);
+      if(sec.bass === 1 && s % 4 === 0) bassNote(t, ch[0] - 12, stepDur * 3.9, 0.30);
+      else if(sec.bass === 2 && s % 2 === 0) bassNote(t, ch[0] - 12, stepDur * 1.92, 0.27);
 
-      /* 分解和弦 */
+      /* 分解和弦。arp 表示「一小节发几次声」。
+         用槽位表映射到具体步位，而不是 s % (16/arp)——
+         后者只支持能整除 16 的密度（8、16），写 6 会得到 2.67 步，
+         取模判断直接失效，整段分解和弦消失。 */
       if(sec.arp){
-        var gap = 16 / sec.arp;
-        if(s % gap === 0){
-          var ai = Math.floor(s / gap) % 3;
-          var oct = (Math.floor(s / gap) % 2) ? 12 : 24;
+        var slot = ARP_SLOTS[sec.arp];
+        if(slot && slot[s]){
+          var ai = slot[s].idx % ch.length;
+          var oct = slot[s].oct;
           arpNote(t, ch[ai] + oct, stepDur * 1.1, 0.075);
         }
       }
@@ -4167,7 +4213,7 @@ function renderPickers(){
 
 /* 音频控制：总静音 + 两路音量 */
 var AUDIO = {
-  bgm: 0.28,
+  bgm: 0.21,
   sfx: 0.55,
   muted: false,
   apply: function(){
