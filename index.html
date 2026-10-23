@@ -1505,6 +1505,7 @@ var BGM = (function(){
      同样音量下内容响度涨了约 86%，不降回来会盖住射击音效。 */
   var vol = 0.21, muted = false;
   var step = 0, nextTime = 0, timer = null, noiseBuf = null;
+  var startedAt = -1;   // 起播时刻，用来判断换曲时是否需要「先压下再抬起」
 
   /* ── 三首曲子的骨架 ── */
   var SONG = {
@@ -1547,8 +1548,11 @@ var BGM = (function(){
      v0.7 的 intro/outro 全填 0，导致每轮循环有 3 小节没有节奏，
      用户听到的就是「戛然而止，然后播第二段」。 */
   var SEC = {
-    /* 前奏：只有低音根音 + 四分踩镲 + 铺底，最薄但脉搏在 */
-    intro: {bass:1, arp:0,  lead:0, pad:1, kick:0, snare:0, hat:2, crash:0},
+    /* 前奏：低音 + 分解 + 底鼓 + 踩镲 + 开篇一下镲。
+       原来是 arp:0 / kick:0，只有低音和踩镲 ——
+       把最薄的一小节放在整首的最开头，等于一上来就没内容。
+       现在只比主歌少一个「军鼓/旋律」，但第一拍有镲片，开口就有声。 */
+    intro: {bass:1, arp:8,  lead:0, pad:1, kick:1, snare:0, hat:2, crash:1},
     a:     {bass:1, arp:8,  lead:0, pad:1, kick:1, snare:0, hat:2, crash:0},
     b:     {bass:1, arp:8,  lead:1, pad:1, kick:1, snare:1, hat:2, crash:0},
     c:     {bass:2, arp:16, lead:2, pad:1, kick:2, snare:2, hat:1, crash:1},
@@ -1626,7 +1630,11 @@ var BGM = (function(){
     gn.gain.setValueAtTime(0, t);
     gn.gain.linearRampToValueAtTime(v, t + 0.014);
     gn.gain.linearRampToValueAtTime(v * 0.82, t + dur * 0.58);   // 保持段
-    gn.gain.exponentialRampToValueAtTime(0.0008, t + dur);
+    /* 尾巴收到 26%，不再压到 0.0008。
+       压到接近 0 的时候，每个音的最后一两成时长是听不见的，
+       一拍接一拍就是「顿、顿、顿」，小节线前尤其明显 ——
+       实测小节线前 0.25 秒会塌到峰值的 5%。留 26% 让下一拍直接接上。 */
+    gn.gain.exponentialRampToValueAtTime(v * 0.26, t + dur);
     o.connect(f); f.connect(gn); gn.connect(g);
     o.start(t); o.stop(t + dur + 0.03);
   }
@@ -1675,7 +1683,10 @@ var BGM = (function(){
       gn.gain.setValueAtTime(pk * 0.45, t);
       gn.gain.linearRampToValueAtTime(pk, t + 0.16);
       gn.gain.setValueAtTime(pk, t + dur*0.72);
-      gn.gain.exponentialRampToValueAtTime(0.0006, t + dur);
+      /* 释放到 12% 就停，不压到接近 0：压到 0.0006 时，
+         每小节最后 0.3 秒会明显塌下去，小节线前后就是一次「一顿」。
+         留 12% 让相邻两小节的铺底真正接上。 */
+      gn.gain.exponentialRampToValueAtTime(pk * 0.12, t + dur);
       o.connect(f); f.connect(gn); gn.connect(g);
       o.start(t); o.stop(t + dur + 0.06);
     });
@@ -1751,7 +1762,7 @@ var BGM = (function(){
       if(sec.pad && s === 0) pad(t, ch, stepDur * 16.4, 0.095);
 
       /* 低音 */
-      if(sec.bass === 1 && s % 4 === 0) bassNote(t, ch[0] - 12, stepDur * 3.9, 0.30);
+      if(sec.bass === 1 && s % 4 === 0) bassNote(t, ch[0] - 12, stepDur * 4.0, 0.30);
       else if(sec.bass === 2 && s % 2 === 0) bassNote(t, ch[0] - 12, stepDur * 1.92, 0.27);
 
       /* 分解和弦。arp 表示「一小节发几次声」。
@@ -1826,12 +1837,24 @@ var BGM = (function(){
       if(playing){ this.setMode(m || mode); return; }
       mode = m || 'menu';
       playing = true;
+      startedAt = AC.currentTime;
       paused = false;
       step = 0;
-      nextTime = AC.currentTime + 0.1;
+      /* 预排 60ms 就够，原来是 100ms —— 这 0.1 秒是实打实的静音 */
+      nextTime = AC.currentTime + 0.06;
       if(timer) clearInterval(timer);
       timer = setInterval(schedule, 25);
-      this._apply(1.4);
+      /* 起播增益：直接抬到 62%，再 0.2 秒补满。
+         原来这里调 _apply(1.4) 做 1.4 秒指数淡入 —— 从 0.0001 指数爬到 0.21，
+         前半段等于静音。实测首秒音量只有峰值的 1.4%，玩家听到的就是「没声」。
+         起播时没有「上一段」需要淡出，这个淡入是自己在制造沉默。 */
+      if(g && AC){
+        var t0 = AC.currentTime;
+        var target = (muted || paused) ? 0.0001 : vol;
+        g.gain.cancelScheduledValues(t0);
+        g.gain.setValueAtTime(Math.max(target * 0.62, 0.0001), t0 + 0.012);
+        g.gain.linearRampToValueAtTime(Math.max(target, 0.0001), t0 + 0.22);
+      }
     },
     /* 换曲：先压到静音再抬起来，用时 0.6 秒。
        和外部播的「咻」叠在一起，听起来是转场而不是断掉。
@@ -1843,10 +1866,20 @@ var BGM = (function(){
       nextTime = AC.currentTime + 0.1;
       if(!playing || !g || !AC) return;
       var target = (muted || paused) ? 0.0001 : vol;
+      /* 起播后 0.35 秒内就换曲，说明压根没有「上一首」可淡出。
+         这时候做 0.09 秒压下 + 0.62 秒抬起，只是把刚出来的声音又抹掉。
+         典型场景：玩家第一次交互就是点「开始对战」——菜单曲刚起就被切走。
+         这种情况直接接上，0.25 秒补到目标音量。 */
+      var fresh = (AC.currentTime - startedAt) < 0.35;
       g.gain.cancelScheduledValues(AC.currentTime);
-      g.gain.setValueAtTime(Math.max(g.gain.value, 0.0001), AC.currentTime);
-      g.gain.exponentialRampToValueAtTime(0.0001, AC.currentTime + 0.09);
-      g.gain.exponentialRampToValueAtTime(Math.max(target, 0.0001), AC.currentTime + 0.62);
+      if(fresh){
+        g.gain.setValueAtTime(Math.max(target * 0.62, 0.0001), AC.currentTime + 0.01);
+        g.gain.linearRampToValueAtTime(Math.max(target, 0.0001), AC.currentTime + 0.25);
+      } else {
+        g.gain.setValueAtTime(Math.max(g.gain.value, 0.0001), AC.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.0001, AC.currentTime + 0.09);
+        g.gain.exponentialRampToValueAtTime(Math.max(target, 0.0001), AC.currentTime + 0.62);
+      }
     },
     stop: function(){
       if(!playing) return;
@@ -3454,7 +3487,8 @@ function nextWave(){
 /* 各波次「标准配装」的预期 DPS，与 docs/爆裂弓箭手_数值分析表.xlsx 的
    「玩家成长 · 建议DPS」列一一对应。BOSS 血量由它反推，
    这样 BOSS 战时长稳定在 12-18 秒，不会因为写死一个常数而崩。
-   改武器或被动参数后，必须重跑 build_numbers.py 同步这张表。 */
+   现在它只用于「标准配装参考」和数值自洽校验（docs/tools/calc_curve.py），
+   不再决定 BOSS 血量——那已经改成按实时 DPS 派生。改武器参数后仍要重跑工具同步。 */
 var EXPECTED_DPS = [13, 32, 87, 127, 451, 693, 760, 1227, 1629, 2387];
 
 /* 清场：BOSS 登场时小兵全部震散。
@@ -4486,12 +4520,16 @@ function buildCodexMonster(){
         '<div><div class="cx-name">' + b.name + '</div>' +
         '<span class="cx-tag">' + b.tag + '</span></div>' +
       '</div>';
-    var hp = Math.round(EXPECTED_DPS[b.wave - 1] * (b.wave >= 10 ? 28 : 16));
+    /* 血量没有固定值：开战那一刻按玩家真实 DPS 派生（见 spawnBoss）。
+       这里原来用 EXPECTED_DPS × 16/28 算了个具体数字，目标秒数还是旧值，
+       显示的数和实际打起来对不上。改成给出公式本身。 */
+    var ttk = b.wave >= 10 ? 20 : 12;
     var body = '<div class="cx-look">' + b.look + '</div>' +
       '<div class="cx-stats">' +
-        '<div class="cx-stat"><span>血量</span><b>' + hp.toLocaleString() + '</b></div>' +
-        '<div class="cx-stat"><span>目标耗时</span><b>' + (b.wave >= 10 ? 28 : 16) + ' 秒</b></div>' +
+        '<div class="cx-stat"><span>血量</span><b>实时派生</b></div>' +
+        '<div class="cx-stat"><span>目标耗时</span><b>' + ttk + ' 秒</b></div>' +
       '</div>' +
+      '<div class="cx-look" style="font-size:11.5px"><b>血量公式：</b>你的单目标 DPS × ' + ttk + ' 秒</div>' +
       '<div class="cx-look" style="font-size:11.5px"><b>招式：</b>' + b.moves + '</div>' +
       '<div class="cx-note">' + b.note + '</div>';
     html += codexCard(head, body);
