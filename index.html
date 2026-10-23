@@ -73,17 +73,155 @@ h1.logo em{font-style:normal;color:var(--yel);display:block}
 .tiny{font-size:12px;line-height:1.7;color:#5b5b6b}
 
 /* ── 开始界面 ── */
-#scr-title{gap:10px}
-.pickrow{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
-.pick{flex:1 1 150px;min-width:0;background:#fff;border:4px solid var(--ink);border-radius:5px;
-  padding:12px 14px;cursor:pointer;transition:transform .1s,box-shadow .1s;box-shadow:4px 4px 0 var(--ink)}
-.pick:hover{transform:translate(-2px,-2px);box-shadow:6px 6px 0 var(--ink)}
-.pick.on{background:var(--yel);box-shadow:4px 4px 0 var(--mag)}
-.pick b{display:block;font-size:16px;font-weight:800}
-.pick s{display:block;text-decoration:none;font-size:12px;color:#4a4a58;margin-top:3px}
-.pick .tagline{font-family:var(--disp);font-size:11px;letter-spacing:.12em;color:var(--mag);margin-top:5px}
+/* 标题页：3D 背景虚化压暗，前景卡片才是焦点 */
+body.is-title canvas#gl{
+  filter:blur(2.5px) brightness(.78) saturate(.85);
+  transition:filter .35s ease;
+}
+
+/* ── 开始界面── */
+/* 底层压暗：3D 场景退到背景，面板才是焦点 */
+#scr-title{
+  justify-content:center;
+  overflow-y:auto;
+  padding:clamp(8px,2vh,22px) 16px;
+  background:radial-gradient(ellipse 96% 78% at 50% 42%,
+    rgba(10,14,32,.32) 0%, rgba(8,10,24,.72) 60%, rgba(8,10,24,.88) 100%);
+}
+
+/* 标题：单行收紧，去掉三层描边 */
+#scr-title .logo{
+  font-size:clamp(28px,5vw,52px);
+  text-shadow:3px 3px 0 var(--mag),6px 6px 0 var(--ink);
+  -webkit-text-stroke:4px var(--ink);
+}
+#scr-title .sub{
+  position:relative; z-index:1;
+  display:inline-block;
+  margin-top:16px;
+  padding:4px 16px;
+  background:var(--ink);
+  color:var(--yel);
+  border:2px solid var(--yel);
+  border-radius:3px;
+  font-size:clamp(10px,1.4vw,12px);
+  letter-spacing:.26em;
+  -webkit-text-stroke:0;
+  text-shadow:none;
+}
+
+/* 主体：左设置 / 右说明，两列平行 */
+.t-body{
+  flex:0 1 auto; min-height:0;
+  display:flex; gap:14px; align-items:stretch;
+  width:100%; max-width:min(1160px,95vw);
+  margin:clamp(8px,1.6vh,16px) 0;
+}
+.t-col{
+  border:5px solid var(--ink); border-radius:6px;
+  box-shadow:8px 8px 0 var(--ink);
+  padding:clamp(16px,1.7vw,26px) clamp(18px,2vw,32px);
+  display:flex; flex-direction:column; min-height:0;
+}
+
+/* 左列：白底，这里要你动手 */
+.t-setup{
+  flex:1 1 56%; background:var(--paper); color:var(--ink);
+  transform:skewX(-1deg);
+  justify-content:center;
+}
+.t-setup > *{flex:0 0 auto}
+
+/* 右列：深底，这里只需要读 */
+.t-howto{flex:1 1 44%; max-width:375px; background:var(--ink); color:var(--paper)}
+.t-howhead{
+  font-family:var(--disp); font-size:13px; letter-spacing:.3em;
+  color:var(--yel); border-bottom:3px solid rgba(255,246,233,.26);
+  padding-bottom:8px; margin-bottom:6px;
+}
+.t-howto > *{flex:0 0 auto}
+.t-rows{display:flex; flex-direction:column; gap:15px; flex:1 1 auto;
+  justify-content:space-evenly}
+.t-row{display:flex; gap:10px; align-items:flex-start; font-size:clamp(12.5px,1.05vw,15px); line-height:1.55}
+.t-row b{
+  flex:0 0 44px; font-family:var(--disp); font-size:13px;
+  letter-spacing:.14em; color:var(--cyn);
+}
+.t-row span{color:#cfd4dd; min-width:0}
+.t-keys{
+  margin-top:auto; padding-top:12px;
+  border-top:2px dashed rgba(255,246,233,.18);
+  font-size:10px; letter-spacing:.14em; color:#8a8a9a; text-align:center;
+}
+
+/* 步骤序号：让“先选什么后选什么”一目了然 */
+.t-step{display:flex; align-items:center; gap:9px; margin-bottom:11px}
+.t-step + .t-step, .t-step.mt{margin-top:20px}
+.t-step i{
+  flex:0 0 25px; width:25px; height:25px; border-radius:50%;
+  background:var(--mag); color:#fff; border:3px solid var(--ink);
+  font-family:var(--disp); font-style:normal; font-size:14px;
+  display:flex; align-items:center; justify-content:center;
+}
+.t-step b{font-family:var(--disp); font-size:clamp(15px,1.2vw,18px); letter-spacing:.16em}
+.t-step s{
+  text-decoration:none; font-size:11px; color:#7a7a8a;
+  margin-left:10px; white-space:nowrap;
+}
+
+/* 角色卡：两列对齐，不再一个大一个小 */
+.pickrow{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+.pick{
+  display:flex; gap:12px; align-items:flex-start;
+  background:#fff; color:var(--ink);
+  border:4px solid var(--ink); border-radius:5px;
+  padding:clamp(12px,1.2vw,18px) clamp(13px,1.3vw,19px); cursor:pointer;
+  transition:transform .1s, box-shadow .1s;
+  box-shadow:4px 4px 0 var(--ink);
+}
+.pick:hover{transform:translate(-2px,-2px); box-shadow:6px 6px 0 var(--ink)}
+.pick.on{background:var(--yel); box-shadow:4px 4px 0 var(--mag)}
+.pico{
+  flex:0 0 clamp(38px,3.4vw,50px); width:clamp(38px,3.4vw,50px);
+  height:clamp(38px,3.4vw,50px); border-radius:50%;
+  border:3px solid var(--ink); color:#0a0a12;
+  display:flex; align-items:center; justify-content:center;
+  font-family:var(--disp); font-size:clamp(19px,1.7vw,25px); line-height:1;
+}
+.ptxt{min-width:0; flex:1 1 auto}
+.pick b{display:block; font-size:clamp(17px,1.45vw,22px); font-weight:800; line-height:1.2}
+.pick s{display:block; text-decoration:none; color:#4a4a58;
+  margin-top:5px; line-height:1.55; font-size:clamp(11.5px,1vw,13.5px)}
+.pick .tagline{
+  display:inline-block; margin-top:6px;
+  font-family:var(--disp); font-size:9px; letter-spacing:.12em;
+  background:var(--ink); color:var(--yel); padding:1px 6px; border-radius:2px;
+}
+
+/* 开始按钮：占一行，不再跟其他控件挤 */
+.startbig{
+  flex:0 0 auto;
+  font-size:clamp(20px,3.2vw,32px);
+  padding:13px 62px;
+  margin-top:clamp(10px,2vh,20px);
+  animation:pulseBtn 2.6s ease-in-out infinite;
+}
+@keyframes pulseBtn{
+  0%,100%{box-shadow:8px 8px 0 var(--ink)}
+  50%{box-shadow:8px 8px 0 var(--ink), 0 0 0 7px rgba(255,46,136,.22)}
+}
+#scr-title .hint{margin-top:clamp(6px,1.2vh,12px); font-size:10px; color:#b9c0cc}
+
+/* 窄屏 / 竖屏：两列改单列 */
+@media (max-width: 860px){
+  .t-body{flex-direction:column; gap:10px; overflow-y:auto}
+  .t-howto{max-width:none}
+  .t-rows{flex-direction:row; flex-wrap:wrap; gap:6px 14px}
+  .t-row b{flex:0 0 32px}
+}
+
 .rate{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
-.rate button{flex:1 1 70px;font-family:var(--ui);font-weight:800;font-size:13px;padding:9px 6px;
+.rate button{flex:1 1 70px;font-family:var(--ui);font-weight:800;font-size:14px;padding:14px 6px;
   background:#fff;color:var(--ink);border:3px solid var(--ink);border-radius:4px;cursor:pointer;
   box-shadow:3px 3px 0 var(--ink)}
 .rate button.on{background:var(--cyn);box-shadow:3px 3px 0 var(--mag)}
@@ -346,7 +484,7 @@ h1.logo em{font-style:normal;color:var(--yel);display:block}
   background:var(--yel);border:3px solid var(--ink);cursor:pointer}
 </style>
 </head>
-<body>
+<body class="is-title">
 <canvas id="gl"></canvas>
 <div id="poster"></div>
 <div id="speedlines"></div>
@@ -404,24 +542,37 @@ h1.logo em{font-style:normal;color:var(--yel);display:block}
 
 <!-- ══ 开始界面 ══ -->
 <div id="scr-title" class="screen">
-  <h1 class="logo">POW!<em>ARCHER</em></h1>
-  <div class="sub">爆裂弓箭手 · 墨潮割草</div>
-  <div class="panel" style="margin-top:8px">
-    <div class="sechead">选择你的射手<span>不同起手，不同流派</span></div>
-    <div class="pickrow" id="heroes"></div>
-    <div class="sechead">怪物刷新频率<span>局内暂停菜单可再调</span></div>
-    <div class="rate" id="rates"></div>
-    <div class="sechead">操作<span>全程只需要走位</span></div>
-    <div class="tiny">
-      WASD / 方向键移动，触屏左半屏拖动摇杆。<b>攻击全自动</b>，角色会朝最近的敌人开火。<br>
-      升级时三选一，宝箱开随机武器。按 <b>TAB</b> 打开背包换掉不想要的武器。<br>
-      活过 10 波。第 5 波、第 10 波有 BOSS。
-    </div>
-    <div style="display:flex;justify-content:center;margin-top:18px">
-      <button class="btn" id="startbtn">开 始 对 战</button>
-    </div>
+  <header class="t-top">
+    <h1 class="logo">POW!<em>ARCHER</em></h1>
+    <div class="sub">爆裂弓箭手　墨潮割草</div>
+  </header>
+
+  <div class="t-body">
+    <!-- 左：需要你点的 -->
+    <section class="t-col t-setup">
+      <div class="t-step"><i>1</i><b>选择射手</b><s>两种起手，两种流派</s></div>
+      <div class="pickrow" id="heroes"></div>
+
+      <div class="t-step"><i>2</i><b>刷怪密度</b><s>局内暂停还能再调</s></div>
+      <div class="rate" id="rates"></div>
+    </section>
+
+    <!-- 右：只需要看的 -->
+    <aside class="t-col t-howto">
+      <div class="t-howhead">玩法速览</div>
+      <div class="t-rows">
+        <div class="t-row"><b>移动</b><span>WASD 或方向键，触屏拖左半屏</span></div>
+        <div class="t-row"><b>攻击</b><span>全自动，自己锁最近的敌人</span></div>
+        <div class="t-row"><b>升级</b><span>三选一，武器满级可进化超武</span></div>
+        <div class="t-row"><b>宝箱</b><span>开出随机武器与被动</span></div>
+        <div class="t-row"><b>目标</b><span>活过 10 波，含 2 个 BOSS</span></div>
+      </div>
+      <div class="t-keys">TAB 背包　ESC 暂停　M 静音</div>
+    </aside>
   </div>
-  <div class="hint">点击任意处开启背景音乐 · M 键开关 · MADE WITH WORKBUDDY</div>
+
+  <button class="btn startbig" id="startbtn">开 始 对 战</button>
+  <div class="hint">点击任意处开启背景音乐 · MADE WITH WORKBUDDY</div>
 </div>
 
 <!-- ══ 升级三选一 ══ -->
@@ -2886,6 +3037,7 @@ function resetGame(){
 }
 function startGame(){
   unlockAudio();
+  document.body.classList.remove('is-title');
   tryLockLandscape();   /* 用户点击这一下里去请求全屏横屏 */
   SFX.whoosh();
   BGM.setMode('battle');
@@ -2962,10 +3114,14 @@ var RATES = [
 function renderPickers(){
   var hb = $('heroes');
   hb.innerHTML = '';
-  HEROES.forEach(function(h){
+  HEROES.forEach(function(h, idx){
     var d = document.createElement('div');
     d.className = 'pick' + (h.id === chosenHero ? ' on' : '');
-    d.innerHTML = '<b>' + h.name + '</b><s>' + h.sub + '</s><div class="tagline">' + h.tag + '</div>';
+    var pcol = idx === 0 ? '#00e5ff' : '#ff5b52';
+    d.innerHTML =
+      '<div class="pico" style="background:' + pcol + '">' + h.name.charAt(0) + '</div>' +
+      '<div class="ptxt"><b>' + h.name + '</b><s>' + h.sub + '</s>' +
+      '<div class="tagline">' + h.tag + '</div></div>';
     d.onclick = function(){ chosenHero = h.id; renderPickers(); };
     hb.appendChild(d);
   });
