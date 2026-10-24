@@ -275,12 +275,13 @@ body.is-title canvas#gl{
   position:relative;overflow:hidden}
 .wavebar .fill{height:100%;background:repeating-linear-gradient(45deg,var(--yel) 0 6px,var(--mag) 6px 12px);
   width:0;transition:width .2s}
-.wavebar .lbl{font-family:var(--disp);font-size:11px;letter-spacing:.16em;color:var(--paper);
+/* 波次标签已并入计时器副标题，这里保留节点只为兼容旧引用 */
+.wavebar .lbl{display:none;font-family:var(--disp);font-size:11px;letter-spacing:.16em;color:var(--paper);
   text-align:center;margin-top:4px;text-shadow:none;background:rgba(10,10,18,.72);
-  display:inline-block;padding:2px 10px;border-radius:3px}
+  padding:2px 10px;border-radius:3px}
 .wavebar{text-align:center}
-.hud-left{width:min(240px,32vw)}
-.hpwrap{background:rgba(10,10,18,.72);border:4px solid var(--ink);padding:5px 7px;
+.hud-left{width:min(300px,44vw);display:flex;align-items:flex-end;gap:8px}
+.hpwrap{flex:1 1 auto;min-width:0;background:rgba(10,10,18,.72);border:4px solid var(--ink);padding:5px 7px;
   box-shadow:4px 4px 0 rgba(10,10,18,.45)}
 .hpwrap .row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px}
 .hpwrap .row b{font-family:var(--disp);font-size:15px;letter-spacing:.1em}
@@ -294,8 +295,9 @@ body.is-title canvas#gl{
 .lvbadge{display:inline-block;background:var(--yel);color:var(--ink);border:4px solid var(--ink);
   padding:3px 12px;transform:skewX(-8deg);box-shadow:4px 4px 0 rgba(10,10,18,.55);
   font-family:var(--disp);font-size:17px;letter-spacing:.08em}
+/* 击杀数是白字，压在天上基本看不见 —— 给一块深色底，任何背景都能读 */
 .kills{margin-top:0;font-family:var(--disp);font-size:12px;letter-spacing:.14em;color:var(--paper);
-  text-shadow:2px 2px 0 var(--ink)}
+  text-shadow:2px 2px 0 var(--ink);background:rgba(10,10,18,.62);padding:2px 7px;border-radius:3px}
 .xpwrap{position:absolute;left:0;right:0;bottom:0;padding:0 0 2px}
 .xpbar{height:16px;background:rgba(10,10,18,.8);border-top:4px solid var(--ink);position:relative}
 .xpbar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--cyn),var(--yel));
@@ -611,33 +613,43 @@ body.is-title canvas#gl{
   #volpanel{display:none !important}
 
   /* ── HUD：压缩所有控件，并把上半区让开音频图标 ── */
-  .hud-top{padding:6px 10px; gap:6px}
-  .hud-left{width:min(190px,30vw)}
+  .hud-top{padding:6px 10px; gap:8px}
+  /* 左列 = 血条 + 等级（同一行）。等级从右上挪过来之后，
+     右上只剩击杀数，不再需要 38px 的让位空间，顶部整块矮了一截。 */
+  .hud-left{width:min(250px,42vw);gap:6px}
   .hpwrap{padding:3px 5px; border-width:3px; box-shadow:3px 3px 0 rgba(10,10,18,.4)}
   .hpwrap .row{margin-bottom:2px}
   .hpwrap .row b{font-size:11px}
   .hpwrap .row span{font-size:10px}
   .hpbar{height:9px; border-width:2px}
 
-  .timerbox{padding:3px 11px; border-width:3px; box-shadow:3px 3px 0 rgba(10,10,18,.5)}
-  .timerbox b{font-size:19px}
-  .timerbox s{font-size:8px; letter-spacing:.14em}
-  .hud-mid{gap:5px}
-  .wavebar{width:min(210px,28vw)}
-  .wavebar .track{height:7px; border-width:2px}
-  .wavebar .lbl{font-size:9px; padding:1px 7px; margin-top:3px}
+  .timerbox{padding:2px 12px; border-width:3px; box-shadow:3px 3px 0 rgba(10,10,18,.5)}
+  .timerbox b{font-size:18px}
+  .timerbox s{font-size:8px; letter-spacing:.06em; margin-top:1px}
+  .hud-mid{gap:3px}
+  .wavebar{width:min(190px,40vw)}
+  .wavebar .track{height:5px; border-width:2px}
+  /* 手机上「本波剩余 Ns」已经并进计时器下面那行，标签整行去掉，
+     否则它和三秒后弹出的提示条会叠在同一个位置。 */
+  .wavebar .lbl{display:none}
 
-  /* 等级/击杀那块下移，避开右上角的静音图标 */
-  .hud-right{padding-top:38px; gap:6px}
-  .lvbadge{font-size:15px; padding:2px 9px}
-  .kills{font-size:10px}
+  /* 右上只剩击杀数，避开静音图标即可 */
+  .hud-right{padding-top:40px; gap:0}
+  .lvbadge{font-size:12px; padding:1px 8px; border-width:3px; box-shadow:3px 3px 0 rgba(10,10,18,.45)}
+  .kills{font-size:9px; letter-spacing:.1em}
 
-  /* 底部：背包按钮、武器槽、经验条一起收 */
-  #bagbtn{font-size:11px; padding:4px 13px}
-  #slots{gap:5px}
-  .slot{width:34px; height:34px}
+  /* 底部：超武环 / 背包按钮 / 武器槽 / 经验条，四块各占一段，互不叠 */
+  #ultbox{width:62px;height:62px;left:8px;bottom:22px}
+  /* 62px 的环里放不下四个汉字，手机上只留百分比 */
+  #ultbox .ucore b{display:none}
+  #ultbox .ucore s{font-size:11px; letter-spacing:.02em}
+  #bagbtn{font-size:11px; padding:3px 12px; bottom:20px}
+  #slots{gap:5px; right:8px; bottom:16px}
+  .slot{width:32px; height:32px; border-width:2px; font-size:10px}
+  .slot .pips u{width:4px; height:2px}
   .xpwrap{padding:0 8px}
-  .xpbar{height:10px; border-width:2px}
+  .xpbar{height:8px; border-width:2px}
+  .xpbar span{font-size:8px; letter-spacing:.12em}
 }
 
 /* 更矮的（部分安卓机 360 高）：再砍一档 */
@@ -680,8 +692,8 @@ body.is-title canvas#gl{
 
   /* 经验条：16px 高 + 文字会在 390 高里被底边裁掉，压薄 */
   .xpwrap{padding:0}
-  .xpbar{height:13px; border-top-width:3px}
-  .xpbar span{font-size:9px; letter-spacing:.1em}
+  .xpbar{height:8px; border-top-width:2px}
+  .xpbar span{font-size:8px; letter-spacing:.1em}
 }
 
 /* ══════════ 主页视觉升级 ══════════
@@ -927,6 +939,9 @@ body.is-title canvas#gl{
         <div class="row"><b>HP</b><span id="hptxt">100 / 100</span></div>
         <div class="hpbar"><i id="hpfill"></i></div>
       </div>
+      <!-- 等级和血量都是「我现在什么状态」，放一起看最顺。
+           原来在右上角，被静音按钮往下挤了 38px，正好和波次条撞在同一水平带。 -->
+      <div class="lvbadge">LV.<span id="lvtxt">1</span></div>
     </div>
     <div class="hud-mid">
       <div class="timerbox"><b id="clock">0:00</b><s id="wavetxt">WAVE 1 / 10</s></div>
@@ -936,7 +951,6 @@ body.is-title canvas#gl{
       </div>
     </div>
     <div class="hud-right">
-      <div class="lvbadge">LV.<span id="lvtxt">1</span></div>
       <div class="kills">KILLS <span id="killtxt">0</span></div>
     </div>
   </div>
@@ -3180,7 +3194,9 @@ function updateUltUI(force){
   ring.style.strokeDashoffset = (C * (1 - clamp(hero.ult.charge, 0, 1))).toFixed(1);
   ring.style.stroke = u.col;
   $('ulticon').textContent = u.name;
-  $('ultkey').textContent = hero.ult.charge >= 1 ? '空格 释放' : Math.round(hero.ult.charge*100) + '%';
+  $('ultkey').textContent = hero.ult.charge >= 1
+    ? (isTouchDevice() ? '点我释放' : '空格 释放')
+    : Math.round(hero.ult.charge*100) + '%';
   box.classList.toggle('ready', hero.ult.charge >= 1);
 }
 
@@ -3833,7 +3849,9 @@ function toast(msg, col, top){
   var d = document.createElement('div');
   d.className = 'word';
   d.style.left = '50%';
-  d.style.top = top || '18%';
+  /* 18% 在 390 高的手机上正好压在波次条上，三层字叠成一团。
+     矮屏把默认位置挪到 32%，落在计时器下方的空档里。 */
+  d.style.top = top || (innerHeight < 520 ? '32%' : '18%');
   d.style.fontSize = '26px';
   d.style.color = col || '#ffe600';
   d.style.setProperty('--rot', '0deg');
@@ -4125,7 +4143,11 @@ function updateHUD(){
   $('hpfill').style.width = (hpPct*100) + '%';
   $('hptxt').textContent = Math.max(0, Math.ceil(hero.hp)) + ' / ' + hero.maxhp;
   $('clock').textContent = fmtTime(S.t);
-  $('wavetxt').textContent = '第 ' + S.wave + ' 波　共 ' + S.waveTotal + ' 波';
+  /* 剩余秒数并进副标题，波次条下面就不再需要单独一行标签 ——
+     那一行在手机上正好和弹出的提示条撞在一起。 */
+  var leftS = Math.max(0, Math.ceil(S.waveLen - S.waveT));
+  $('wavetxt').textContent = '第 ' + S.wave + ' 波 / ' + S.waveTotal +
+    (S.wave >= S.waveTotal ? ' · 最后一波' : ' · ' + leftS + 's');
   var wp = clamp(S.waveT/S.waveLen, 0, 1);
   $('wavefill').style.width = (wp*100)+'%';
   $('wavelbl').textContent = S.wave === 10 ? '最后一波 · 击败 BOSS' : '本波剩余 ' + Math.ceil(S.waveLen - S.waveT) + 's';
@@ -5807,7 +5829,7 @@ window.POW = {
   spawnEnemy:spawnEnemy, spawnGem:spawnGem, ETYPES:ETYPES, camera:camera, renderer:renderer, eMesh:eMesh,
   refreshStats:refreshStats, ARCH:ARCH, PKEYS:PKEYS, ULT:ULT,
   getBoss: function(){ return boss; }, triggerUlt: triggerUlt,
-  getCamShake: function(){ return camShake; },
+  getCamShake: function(){ return camShake; }, toast: toast,
   getAudio: function(){ return {ac: AC, bgm: BGM, master: masterGain}; },
   get boss(){ return boss; }
 };
