@@ -33,6 +33,24 @@ canvas#gl{position:fixed;inset:0;width:100%;height:100%;display:block}
 #damagetint{position:fixed;inset:0;pointer-events:none;z-index:7;opacity:0;
   background:radial-gradient(circle at 50% 50%,rgba(255,46,136,0) 42%,rgba(255,46,136,.85) 100%);
   transition:opacity .16s}
+/* 超武染色层：按流派色把整个屏幕浸一遍。
+   之前超武只有「局部爆炸 + 一闪」，屏幕上 90% 的面积没有任何变化，
+   所以玩家按完空格觉得「好像什么都没发生」。这一层解决的就是这件事：
+   释放瞬间整块画面换色（screen 混合只会提亮，不会压暗画面）。 */
+#ultwash{position:fixed;inset:0;pointer-events:none;z-index:6;opacity:0;
+  background:radial-gradient(circle at 50% 56%,rgba(255,255,255,0) 18%,var(--uc,#00e5ff) 128%);
+  mix-blend-mode:screen;transition:opacity .16s ease-out}
+/* 超武名大字：比普通拟声词大一倍，从屏幕上方砸下来 */
+.ultname{position:absolute;font-family:var(--disp);font-weight:900;line-height:1;white-space:nowrap;
+  letter-spacing:.04em;-webkit-text-stroke:6px var(--ink);paint-order:stroke fill;
+  text-shadow:0 0 28px currentColor,7px 7px 0 var(--ink);transform-origin:50% 50%;
+  animation:ultNameIn .95s cubic-bezier(.16,1.5,.36,1) forwards}
+@keyframes ultNameIn{
+  0%{opacity:0;transform:translate(-50%,-50%) scale(2.2) rotate(-8deg)}
+  14%{opacity:1;transform:translate(-50%,-50%) scale(1) rotate(-2deg)}
+  74%{opacity:1;transform:translate(-50%,-52%) scale(1.04) rotate(-2deg)}
+  100%{opacity:0;transform:translate(-50%,-64%) scale(1.06) rotate(-2deg)}
+}
 #fx{position:fixed;inset:0;pointer-events:none;z-index:8;overflow:hidden}
 .word{position:absolute;font-family:var(--disp);font-weight:900;line-height:1;white-space:nowrap;
   color:var(--yel);-webkit-text-stroke:5px var(--ink);paint-order:stroke fill;
@@ -868,6 +886,7 @@ body.is-title canvas#gl{
 <div id="poster"></div>
 <div id="speedlines"></div>
 <div id="damagetint"></div>
+<div id="ultwash"></div>
 <div id="fx"></div>
 <div id="flash"></div>
 
@@ -1150,6 +1169,9 @@ scene.fog = new THREE.Fog(0xc4def2, 60, 105);
 var camera = new THREE.PerspectiveCamera(46, innerWidth/innerHeight, 0.5, 220);
 var camTarget = new THREE.Vector3(0,0,0);
 var camShake = 0, camShakeT = 0;
+/* 超武推镜：释放瞬间镜头往后拉一点，把整片战场收进画面。
+   只改机位距离、不改跟随位置，所以不会破坏「硬跟随不抽搐」那条规则。 */
+var ultPunch = 0;
 
 var hemi = new THREE.HemisphereLight(0xffffff, 0x9fc4e8, 0.95);
 scene.add(hemi);
@@ -1304,6 +1326,13 @@ function updateCamera(dt, px, pz){
     var k = Math.max(0.72, Math.min(1, innerHeight / 760));
     camH = 24 * (0.78 + 0.22*k);
     camZ = 16.5 * (0.78 + 0.22*k);
+  }
+  /* 超武推镜：0→1 拉远 14%，1.1 秒内回落。推远才有「看得见整片战场」的感觉，
+     箭雨、空袭这类全屏超武尤其需要。 */
+  if(ultPunch > 0.001){
+    var zp = 1 + ultPunch * 0.14;
+    camH *= zp; camZ *= zp;
+    ultPunch = Math.max(0, ultPunch - dt * 0.9);
   }
 
   /* ── 震屏：trauma 模型（GDC《Juicing Your Cameras With Math》）──
@@ -2694,10 +2723,57 @@ function killBoss(){
 /* ═══════════ 子弹 ═══════════ */
 var bulA = instPool(new THREE.BoxGeometry(0.17, 0.17, 1),
   new THREE.MeshBasicMaterial({color:0x9ff6ff}), 300);
-/* 玩家弹走冷色（青白 / 青绿），把洋红整条让给「敌方威胁」。
-   这样一眼就能判断「这一片是我打的还是冲我来的」。 */
+/* 玩家弹走冷色，把洋红整条让给「敌方威胁」。
+   这样一眼就能判断「这一片是我打的还是冲我来的」。
+   ⚠️ 但冷色只有一个色相就会出问题：箭（青白）、炸弹、飞镖原本挤在同一个池子里，
+   全是青绿，玩家根本分不清自己在放什么 —— 所以每种投掷物单独一个池、单独一个色。 */
 var bulB = instPool(new THREE.OctahedronGeometry(0.24, 0),
-  new THREE.MeshBasicMaterial({color:0x2ee6c0}), 240);
+  new THREE.MeshBasicMaterial({color:0xff3b30}), 240);   // 炸弹：红
+
+/* ── 飞镖 ──
+   三条线里它最需要「看得见」：飞行路线是弧线、还会折回来，
+   玩家必须在余光里就能跟住它。所以做了三件事：
+     ① 形状换成四刃十字星（箭是细长条，形状上先分开）
+     ② 颜色换成亮橙（蓝色地面上的互补色，色相离箭的青色最远）
+     ③ 三层描边：黑边保证任何背景都有轮廓，白心保证有亮点、橙体保证有颜色 */
+function makeShurikenGeo(R, r){
+  /* 手写顶点，不用 ShapeGeometry。
+     Shape 三角化在 r150 下会把这种交替长短半径的星形判成退化多边形，
+     结果是「池子 count 正常、画面上什么都没有」——排查起来极费时间，
+     不如直接给 8 个外点 + 1 个中心点做三角扇。
+     顶点直接铺在 XZ 平面（y=0），从俯视角看就是一枚躺平的星。 */
+  var pts = [];
+  for(var i=0;i<8;i++){
+    var a = i/8*TAU + Math.PI/8;
+    var rad = (i % 2 === 0) ? R : r;
+    pts.push(Math.cos(a)*rad, 0, Math.sin(a)*rad);
+  }
+  pts.push(0, 0, 0);                       // 中心点，索引 8
+  var idx = [];
+  for(var j=0;j<8;j++) idx.push(8, j, (j+1)%8);
+  var g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  g.computeBoundingSphere();
+  return g;
+}
+var SHU_COL = 0xff8a1f;
+var shuOutlinePool = instPool(makeShurikenGeo(0.73, 0.235),
+  new THREE.MeshBasicMaterial({color:0x0a0a12, side:THREE.DoubleSide}), 120);
+var shuBodyPool = instPool(makeShurikenGeo(0.66, 0.212),
+  new THREE.MeshBasicMaterial({color:SHU_COL, side:THREE.DoubleSide}), 120);
+var shuCorePool = instPool(makeShurikenGeo(0.26, 0.085),
+  new THREE.MeshBasicMaterial({color:0xfff3e0, side:THREE.DoubleSide}), 120);
+var shuTrailPool = instPool(new THREE.OctahedronGeometry(0.17, 0),
+  new THREE.MeshBasicMaterial({color:SHU_COL, transparent:true, opacity:0.30,
+                               depthWrite:false}), 260);
+/* 轨迹不靠「记录经过的点」来画 —— 那套依赖帧率，低帧下会断成一地碎屑。
+   改成每次渲染直接按参数方程反算整条弧上的位置，永远是一条连续的线。 */
+var shuPathPool = instPool(new THREE.OctahedronGeometry(0.19, 0),
+  new THREE.MeshBasicMaterial({color:0xffd28a, transparent:true, opacity:0.72,
+                               depthWrite:false}), 320);
+var bulletsC = [];   // 飞镖单独一条队列
 /* ── 敌方弹幕：四层结构，专门为「看得见」设计 ──
    ① 黑壳（BackSide，放大 1.5）：任何亮背景上都有墨线轮廓，灰阶也成立
    ② 洋红本体：危险色独占色相，不再和金色经验球、金色爆炸撞车
@@ -2719,13 +2795,14 @@ var bullets = [], bulletsB = [], eBullets = [];
 
 function spawnBullet(o){
   var b = {
-    x:o.x, y:o.y==null?1.0:o.y, z:o.z, vx:o.vx, vz:o.vz, vy:o.vy||0,
+    x:o.x, y:o.y==null?1.0:o.y, z:o.z, vx:o.vx||0, vz:o.vz||0, vy:o.vy||0,
     dmg:o.dmg, life:o.life||1.6, r:o.r||0.34, pierce:o.pierce||0,
     kind:o.kind||'arrow', spin:o.spin||0, ang:0, hitList:null, homing:o.homing||0,
     wob:o.wob||0, phase:Math.random()*TAU, grow:o.grow||0
   };
   if(b.pierce>0) b.hitList = [];
-  (o.pool==='B'?bulletsB:bullets).push(b);
+  var arr = o.pool === 'B' ? bulletsB : (o.pool === 'C' ? bulletsC : bullets);
+  arr.push(b);
   return b;
 }
 function spawnEBullet(x, z, vx, vz, dmg){
@@ -2811,11 +2888,12 @@ var WDEF = {
     desc:'抛出去落地炸开，范围伤害。怪越密收益越高，清屏主力。'
   },
   shuriken:{
-    name:'回旋镖', short:'飞镖', col:'#2ee6c0', max:5, arch:'throw',
-    cd:[0.85,0.78,0.68,0.56,0.46], dmg:[11,13,16,20,24],
-    cnt:[1,1,2,3,4], coef:0.65, cntEvo:4, coefEvo:1.2, sHit:0.75, sHitEvo:0.35,
-    lv:['单枚回旋','双枚回旋','双枚 + 加速','三枚回旋','四枚 + 追踪'],
-    desc:'飞出去再飞回来，同一发能打两次。五级带自动追踪。'
+    name:'回旋镖', short:'飞镖', col:'#ff8a1f', max:5, arch:'throw',
+    cd:[0.98,0.90,0.80,0.70,0.60], dmg:[11,14,17,19,22],
+    cnt:[1,1,2,2,3], coef:0.55, cntEvo:3, coefEvo:0.95, sHit:0.90, sHitEvo:0.80,
+    hitMul:1.55,
+    lv:['单枚回旋','单枚强化','双枚回旋','双枚 + 加速','三枚 + 双程穿透'],
+    desc:'扔出去划一道弧再收回来，去程回程各算一次伤害。频率比弓慢，单发比弓重。'
   },
   spike:{
     name:'地刺', short:'地刺', color:'#7b2ff7', col:'#7b2ff7', max:5, arch:'melee',
@@ -2866,7 +2944,7 @@ var EVO = {
   laser:    {req:'shot',  name:'湮灭射线', col:'#ffe600', ult:'过载贯穿',   gain:'4 束激光，持续 1.35 秒', desc:'四束激光同时贯穿，持续灼烧'},
   scythe:   {req:'melee', name:'血月斩',   col:'#b6ff3c', ult:'血月',       gain:'6 刃，范围 +60%，吸血', desc:'六把镰刀环绕，命中回复生命'},
   bomb:     {req:'throw', name:'陨石雨',   col:'#ff3b30', ult:'空袭',       gain:'6 颗，爆炸半径 +50%', desc:'六颗炸弹覆盖全场'},
-  shuriken: {req:'throw', name:'无限回旋', col:'#2ee6c0', ult:'超旋',       gain:'4 枚，穿透并追踪', desc:'飞镖绕身盘旋三秒，自动咬住目标'},
+  shuriken: {req:'throw', name:'无限回旋', col:'#ff8a1f', ult:'超旋',       gain:'6 枚，绕两圈，双程全伤害', desc:'六枚飞镖同时抛出，围着战场绕两圈'},
   spike:    {req:'melee', name:'荆棘领域', col:'#7b2ff7', ult:'荆棘爆发',   gain:'5 片，毒池扩大 50%', desc:'脚下铺满尖刺毒池，走过寸草不生'}
 };
 
@@ -2878,13 +2956,94 @@ var ULT = {
   laser:    {name:'过载贯穿', cd:6.5, dur:0.55, col:'#ffe600', tip:'粗光束'},
   bow:      {name:'暴雨模式', cd:7.0, dur:1.80, col:'#00e5ff', tip:'连射'},
   bomb:     {name:'空袭',     cd:7.0, dur:1.00, col:'#ff3b30', tip:'地毯轰炸'},
-  shuriken: {name:'超旋',     cd:5.5, dur:1.50, col:'#2ee6c0', tip:'范围翻倍'},
+  shuriken: {name:'超旋',     cd:5.5, dur:1.35, col:'#ff8a1f', tip:'六枚绕两圈'},
   scythe:   {name:'血月',     cd:6.0, dur:1.10, col:'#b6ff3c', tip:'聚怪斩杀'},
   spike:    {name:'荆棘爆发', cd:5.0, dur:0.70, col:'#7b2ff7', tip:'环形地刺'}
 };
 
 /* 空袭 / 血月的延时结算队列 */
 var ultQueue = [];
+
+/* ═══════════ 天降落箭（弓箭超武「暴雨模式」） ═══════════
+   常态射击是「一条弹道打出去」，超武要做的是「整块地面同时被插满」——
+   覆盖方式变了，玩家才看得出这是在放必杀，而不是攻速快了一点。 */
+var skyArrows = [];
+/* 落箭必须做成「深杆 + 亮头」而不是一根白棒子。
+   背景本来就是浅蓝灰，超武染色之后整屏更亮 —— 白色物体会直接消失。
+   这是美漫那套「所有东西都有墨线」的同一个道理，只是换成深色杆身。 */
+var skyArrowPool = instPool(new THREE.BoxGeometry(0.13, 1.7, 0.13),
+  new THREE.MeshBasicMaterial({color:0x0b2f45}), 170);
+var skyArrowTipPool = instPool(new THREE.ConeGeometry(0.30, 0.62, 6),
+  new THREE.MeshBasicMaterial({color:0xffe600}), 170);
+var skyArrowGlow = instPool(new THREE.OctahedronGeometry(0.34, 0),
+  new THREE.MeshBasicMaterial({color:0x00e5ff, transparent:true, opacity:0.6,
+                               depthWrite:false}), 170);
+
+function dropSkyArrow(dmg){
+  if(skyArrows.length > 140) return;
+  var ang = Math.random()*TAU;
+  var rr = 1.4 + Math.sqrt(Math.random())*11.2;
+  skyArrows.push({
+    x: hero.x + Math.cos(ang)*rr,
+    z: hero.z + Math.sin(ang)*rr,
+    y: 0, h0: 9.5 + Math.random()*3.2,
+    t: 0, land: 0.22 + rr*0.010, k: 0,
+    dmg: dmg, r: 1.25
+  });
+}
+
+function updateSkyArrows(dt){
+  for(var i=skyArrows.length-1;i>=0;i--){
+    var a = skyArrows[i];
+    a.t += dt;
+    a.k = Math.min(1, a.t / a.land);
+    /* 二次曲线下落：起手慢、触地快，比匀速更像被重力拽下来 */
+    a.y = a.h0 * (1 - a.k*a.k);
+    if(a.t < a.land) continue;
+
+    skyArrows.splice(i, 1);
+    forEachEnemy(function(e){
+      if(dist2(a.x, a.z, e.x, e.z) < (a.r + e.r)*(a.r + e.r)) hurtEnemy(e, a.dmg, false);
+    });
+    if(boss && !boss.dead && dist2(a.x, a.z, boss.x, boss.z) < (a.r + boss.r)*(a.r + boss.r)){
+      hurtEnemy(boss, a.dmg, false);
+    }
+    shock(a.x, a.z, 0xffe600, 1.5, 0.16);
+    burst(a.x, 0.45, a.z, 0xffe600, 4, 6.5, 0.5);
+  }
+}
+
+function renderSkyArrows(){
+  var n = 0;
+  for(var i=0;i<skyArrows.length && n < 170;i++){
+    var a = skyArrows[i];
+    var yy = Math.max(0.75, a.y);
+    _dm.rotation.set(0, 0, 0);
+
+    /* 箭杆：高空时拉长，像一道落下来的光 */
+    _dm.position.set(a.x, yy, a.z);
+    _dm.scale.set(1, 1 + (1 - a.k) * 1.5, 1);
+    _dm.updateMatrix();
+    skyArrowPool.setMatrixAt(n, _dm.matrix);
+
+    /* 箭头：接在杆子下方，锥尖朝下 */
+    _dm.position.set(a.x, Math.max(0.45, yy - 0.9 - (1 - a.k) * 0.9), a.z);
+    _dm.rotation.set(Math.PI, 0, 0);
+    _dm.scale.setScalar(1);
+    _dm.updateMatrix();
+    skyArrowTipPool.setMatrixAt(n, _dm.matrix);
+
+    _dm.position.set(a.x, yy + 0.5, a.z);
+    _dm.rotation.set(0, 0, 0);
+    _dm.scale.setScalar(0.8);
+    _dm.updateMatrix();
+    skyArrowGlow.setMatrixAt(n, _dm.matrix);
+    n++;
+  }
+  skyArrowPool.count = n; skyArrowPool.instanceMatrix.needsUpdate = true;
+  skyArrowTipPool.count = n; skyArrowTipPool.instanceMatrix.needsUpdate = true;
+  skyArrowGlow.count = n; skyArrowGlow.instanceMatrix.needsUpdate = true;
+}
 
 /* 蓄力光束的实体（复用同一份 mesh，避免每次造几何） */
 var ultBeam = new THREE.Mesh(
@@ -2911,6 +3070,51 @@ ultRingFx.visible = false; ultRingFx.frustumCulled = false;
 scene.add(ultRingFx);
 
 function ultReady(){ return !!(hero.evoId && hero.ult && hero.ult.charge >= 1); }
+
+/* ─────────── 超武演出 ───────────
+   一个问题：后期 DPS 本来就高，超武只加伤害的话，玩家按完空格看不出区别。
+   所以超武的「感觉」必须由演出承担，而且要是**全屏级**的：
+     ① 整个画面换色（#ultwash）
+     ② 镜头后拉（ultPunch）
+     ③ 超武名大字砸下来（ultname）
+     ④ 一记顿帧，敌人集体凝固
+     ⑤ 释放点的地裂冲击波
+   五层同时发生，玩家不可能没注意到。 */
+var ultWashEl = $('ultwash');
+var _ultWashTimers = [];
+function ultWash(col, peak, hold, total){
+  for(var i=0;i<_ultWashTimers.length;i++) clearTimeout(_ultWashTimers[i]);
+  _ultWashTimers.length = 0;
+  ultWashEl.style.setProperty('--uc', col);
+  ultWashEl.style.opacity = peak;
+  _ultWashTimers.push(setTimeout(function(){ ultWashEl.style.opacity = hold; }, 150));
+  _ultWashTimers.push(setTimeout(function(){ ultWashEl.style.opacity = 0; }, total));
+}
+
+function popUltName(txt, col){
+  var d = document.createElement('div');
+  d.className = 'ultname';
+  d.textContent = txt;
+  d.style.left = '50%';
+  d.style.top = '31%';
+  d.style.color = col;
+  d.style.fontSize = Math.min(innerWidth * 0.085, 86) + 'px';
+  fxEl.appendChild(d);
+  setTimeout(function(){ d.remove(); }, 1000);
+}
+
+/* 六个超武共用的开场。各自分支里只写「形态长什么样」。 */
+function ultOpening(id, u){
+  ultWash(u.col, 0.62, 0.30, Math.max(620, u.dur * 1000 + 260));
+  flash(0.26);
+  speedLines(0.85, 460);
+  shake(0.62);
+  ultPunch = 1;
+  S.hitstop = Math.max(S.hitstop, 0.09);   // 敌人凝固一瞬，给「这一下很重」的体感
+  popUltName(u.name, u.col);
+  shock(hero.x, hero.z, u.col, 10, 0.62);
+  burst(hero.x, 1.15, hero.z, u.col, 26, 13, 1.25);
+}
 
 var _ultUiLast = -1, _ultUiReady = null;
 function updateUltUI(force){
@@ -2963,19 +3167,25 @@ function triggerUlt(){
 
   var base = WDEF[id].dmg[4] * hero.stat.arch[WDEF[id].arch];
 
+  ultOpening(id, u);
+
   if(id === 'laser'){
     /* 过载贯穿：一条 4 倍宽的贯穿光柱，0.55 秒内每 0.1 秒结算一次 */
     hero.ult.ang = a;
     hero.ult.beamTick = 0;
     ultBeam.visible = true; ultBeamCore.visible = true;
     ultBeam.material.color.set(u.col);
-    flash(0.18); speedLines(0.5, 160); shake(0.35);
+    speedLines(0.95, 620);
+    shake(0.4);
     SFX.laser(); SFX.boss();
 
   } else if(id === 'bow'){
-    /* 暴雨模式：1.8 秒内攻速 ×2.6、弹数 +2，由 updateWeapons/fireWeapon 读取 */
-    shock(hero.x, hero.z, u.col, 7, 0.6);
-    flash(0.12); speedLines(0.6, 200);
+    /* 暴雨模式：1.8 秒内，玩家周围整片战场持续落箭。
+       原来是「攻速 ×1.8」，玩家看到的还是同一条弹道，只是快了点 ——
+       后期 DPS 本来就高，这点提速根本看不出来。现在改成真正的天降落箭：
+       屏幕内每一片区域都有箭插下来，形态和常态射击完全不同。 */
+    hero.ult.rainT = 0;
+    hero.ult.rainDmg = base * 0.32;
     SFX.whooshUp ? SFX.whooshUp() : SFX.chest();
 
   } else if(id === 'bomb'){
@@ -2988,11 +3198,11 @@ function triggerUlt(){
     }
     ultQueue.push({type:'air', x: hero.x, z: hero.z, t: 0.72, dmg: base*5.0, r: 4.4,
                    big: true, mark: 0, col: u.col});
-    flash(0.16); SFX.boss();
+    SFX.boss();
 
   } else if(id === 'shuriken'){
-    shock(hero.x, hero.z, u.col, 8, 0.55);
-    flash(0.14); speedLines(0.55, 180);
+    /* 超旋：飞镖数量翻倍、绕两圈，往返路径全部带伤害 */
+    shake(0.35);
     SFX.shoot();
 
   } else if(id === 'scythe'){
@@ -3001,7 +3211,7 @@ function triggerUlt(){
     ultRingFx.material.color.set(u.col);
     hero.ult.pullT = 0.35;
     ultQueue.push({type:'slash', x: hero.x, z: hero.z, t: 0.38, dmg: base*4.0, r: 5.4, col: u.col});
-    flash(0.16); shake(0.3); SFX.boss();
+    shake(0.34); SFX.boss();
 
   } else if(id === 'spike'){
     /* 荆棘爆发：以玩家为圆心 16 枚，先裂地再弹起 */
@@ -3011,7 +3221,7 @@ function triggerUlt(){
                      z: hero.z + Math.sin(ang2)*2.9, t: 0.28,
                      dmg: base*0.9, col: u.col});
     }
-    flash(0.12); shake(0.25); SFX.shoot();
+    speedLines(0.7, 420); shake(0.4); SFX.shoot();
   }
   toast('超武 · ' + u.name, u.col);
   updateUltUI();
@@ -3037,6 +3247,18 @@ function updateUlt(dt){
     if(hero.ult.active <= 0){
       ultBeam.visible = false; ultBeamCore.visible = false;
       hero.ult.beamTick = undefined;
+    }
+  }
+
+  /* 暴雨模式：持续期间每 0.1 秒往整片战场投 3 支落箭。
+     1.8 秒 ≈ 54 支，覆盖半径 12 —— 屏幕上看得见「雨」，不是藏在弹道里。 */
+  if(hero.evoId === 'bow' && hero.ult.active > 0 && hero.ult.rainT !== undefined){
+    hero.ult.rainT -= dt;
+    var guard = 0;
+    while(hero.ult.rainT <= 0 && guard++ < 8){
+      hero.ult.rainT += 0.08;
+      for(var sa=0;sa<4;sa++) dropSkyArrow(hero.ult.rainDmg || 8);
+      shake(0.04);
     }
   }
 
@@ -3198,17 +3420,38 @@ function fireWeapon(w, st, ang, dist, tgt){
     SFX.shoot();
 
   } else if(w.id === 'shuriken'){
-    var ns = evo ? 4 : [1,1,2,3,4][lv-1];
+    /* 飞镖的飞行不走「直线 + 反向」那套，改成一条参数曲线：
+         前向 s = sin(πu)      → 0 出发、中段最远、最后回到原点
+         侧向 l = amp·sin(2πu) → 去程偏一侧、回程偏另一侧
+       两段弧合起来就是一个「叶子」，去和回是两条不同的线 ——
+       玩家能同时看到「扔出去的弧」和「收回来的弧」，而不是原路弹回。
+       伤害按段结算：去程 100%，回程 65%（收回来力量小于扔出去）。 */
+    var ns = evo ? 4 : [1,1,2,2,3][lv-1];
     if(ultShu) ns *= 2;
+    var spread = ultShu ? 0.44 : 0.20;
+    var maxD = 6.4 + lv * 0.55 + (evo ? 1.4 : 0);
     for(var c2=0;c2<ns;c2++){
-      var a4 = ang + (c2-(ns-1)/2)*(ultShu ? 0.52 : (evo?0.9:0.22));
-      var sspd = ultShu ? 47 : 26;
-      spawnBullet({pool:'B', x:hero.x, y:1.0, z:hero.z,
-        vx:Math.sin(a4)*sspd, vz:Math.cos(a4)*sspd,
-        dmg:ultShu ? dmg*1.15 : (evo?dmg*1.5:dmg),
-        pierce:ultShu ? 99 : (evo?3:0),
-        life:ultShu ? 2.1 : (evo?3.2:1.5), r:0.42, kind:'shuriken', spin:1,
-        homing:evo?1:(lv>=5?1:0)});
+      var a4 = ang + (c2-(ns-1)/2)*spread;
+      var ux = Math.sin(a4), uz = Math.cos(a4);
+      var one = ultShu ? dmg*1.10 : (evo ? dmg*1.75 : dmg);
+      var b0 = spawnBullet({pool:'C', x:hero.x+ux*0.8, y:1.02, z:hero.z+uz*0.8,
+        dmg: one, kind:'shuriken', life: 99, r: 0.62});
+      b0.ox = hero.x + ux*0.8; b0.oz = hero.z + uz*0.8;
+      b0.dirx = ux; b0.dirz = uz;
+      b0.sidex = -uz; b0.sidez = ux;
+      b0.maxD = maxD * (ultShu ? 1.2 : 1);
+      /* 侧摆幅度必须「小」。最早按 30% 的飞行距离算，中段偏出去 2.7 单位，
+         比怪的身位还宽 —— 视觉上是一条漂亮的弧线，实战里全部擦身而过。
+         0.9 大约是「一个身位」：去程和回程能看出是两条线，但都在准星附近。 */
+      b0.amp = 0.9;
+      b0.dur = ultShu ? 1.35 : 0.95;
+      b0.u = 0;
+      b0.segsN = ultShu ? 4 : 2;      // 超旋绕两圈，四个半程各算一段
+      b0.segs = []; b0.bossSegs = [];
+      b0.backMul = ultShu ? 1.0 : 0.55;
+      b0.spinA = Math.random()*TAU;
+      b0.tx = b0.x; b0.tz = b0.z;
+      b0.markT = 0;
     }
     SFX.shoot();
 
@@ -3616,7 +3859,10 @@ function estimateDPS(single){
     var sh = w.evo ? (d.sHitEvo == null ? (d.sHit == null ? 1 : d.sHit) : d.sHitEvo)
                    : (d.sHit == null ? 1 : d.sHit);
     var coef = single ? sh : (w.evo ? d.coefEvo : d.coef);
-    total += dmg * cnt / cd * coef;
+    /* 飞镖一趟出去回来打两段（回程按 65% 折算），cnt 只是「几枚」，
+       所以这里要乘上单枚的等效段数，否则背包会把它的输出低估掉一半。 */
+    var hitMul = d.hitMul || 1;
+    total += dmg * cnt / cd * coef * hitMul;
   });
   return Math.round(total);
 }
@@ -3921,7 +4167,7 @@ function nextWave(){
    这样 BOSS 战时长稳定在 12-18 秒，不会因为写死一个常数而崩。
    现在它只用于「标准配装参考」和数值自洽校验（docs/tools/calc_curve.py），
    不再决定 BOSS 血量——那已经改成按实时 DPS 派生。改武器参数后仍要重跑工具同步。 */
-var EXPECTED_DPS = [13, 32, 87, 127, 451, 693, 760, 1227, 1629, 2387];
+var EXPECTED_DPS = [13, 32, 119, 180, 517, 737, 789, 1174, 1419, 1797];
 
 /* 清场：BOSS 登场时小兵全部震散。
    以前是小兵和 BOSS 混在一起打，玩家分不清该躲谁，
@@ -4422,17 +4668,60 @@ function updateBulletArr(arr, dt){
     b.life -= dt;
 
     if(b.kind === 'shuriken'){
-      b.phase += dt;
-      if(!b.turned && b.phase > 0.44){ b.turned = true; b.vx *= -1.55; b.vz *= -1.55; }
-      if(b.homing && b.phase > 0.2){
-        var tt = nearestEnemy(b.x, b.z, 14);
-        if(tt){
-          var hx = tt.x - b.x, hz = tt.z - b.z, hd = Math.hypot(hx,hz)||1;
-          var sp = Math.hypot(b.vx,b.vz);
-          b.vx = lerp(b.vx, hx/hd*sp, dt*4);
-          b.vz = lerp(b.vz, hz/hd*sp, dt*4);
+      /* 飞镖走自己的曲线，不进入下面的「直线位移 + 命中即销毁」通用逻辑。
+         通用逻辑有个致命问题：pierce=0 时第一只怪就把它吃掉了，
+         所以「出去再回来」这个卖点从来没真正发生过 —— 玩家只看见一道青绿色的东西
+         撞一下就没了，感受不到来回。现在飞镖只在自己的寿命结束时消失。 */
+      b.u += dt / b.dur;
+      if(b.u >= 1){
+        burst(b.x, b.y, b.z, SHU_COL, 4, 5, 0.55);
+        arr.splice(i, 1);
+        continue;
+      }
+      var su = b.u;
+      var sDist = Math.sin(Math.PI * su);          // 前向：0 → 最远 → 0
+      var lat = Math.sin(TAU * su) * b.amp;        // 侧向：去程偏一边、回程偏另一边
+      b.x = b.ox + b.dirx * b.maxD * sDist + b.sidex * lat;
+      b.z = b.oz + b.dirz * b.maxD * sDist + b.sidez * lat;
+      /* 切线方向用解析导数算，飞镖朝向永远贴着轨迹走 */
+      var dxu = b.dirx * b.maxD * Math.PI * Math.cos(Math.PI*su)
+              + b.sidex * b.amp * TAU * Math.cos(TAU*su);
+      var dzu = b.dirz * b.maxD * Math.PI * Math.cos(Math.PI*su)
+              + b.sidez * b.amp * TAU * Math.cos(TAU*su);
+      if(Math.hypot(dxu, dzu) > 0.01) b.ang = Math.atan2(dxu, dzu);
+      b.spinA += dt * 24;
+      b.tx = b.x - dxu * 0.05; b.tz = b.z - dzu * 0.05;   // 拖尾落点
+
+      var lim2 = ARENA_R - 1, dd2 = Math.hypot(b.x, b.z);
+      if(dd2 > lim2){ b.x = b.x/dd2*lim2; b.z = b.z/dd2*lim2; }
+
+      /* 每一「段」单独记账：去程、回程（超旋时四段）各能打同一个敌人一次。
+         这样出去的路上有伤害、回来的路上也有伤害，而不是走个过场。 */
+      var seg = Math.min(b.segsN-1, Math.floor(su * b.segsN));
+      var hm = b.segs[seg] || (b.segs[seg] = []);
+      var legDmg = b.dmg * (seg % 2 === 1 ? b.backMul : 1);
+      for(var k2=0;k2<4;k2++){
+        var list2 = E[EKEYS[k2]];
+        for(var j2=0;j2<list2.length;j2++){
+          var e2 = list2[j2];
+          if(e2.dead || hm.indexOf(e2) >= 0) continue;
+          var rr2 = b.r + e2.r;
+          if(dist2(b.x, b.z, e2.x, e2.z) < rr2*rr2){
+            hm.push(e2);
+            hurtEnemy(e2, legDmg, false);
+            burst(b.x, b.y, b.z, SHU_COL, 3, 5, 0.55);
+          }
         }
       }
+      if(boss && !boss.dead && b.bossSegs.indexOf(seg) < 0){
+        var br2 = b.r + boss.r;
+        if(dist2(b.x, b.z, boss.x, boss.z) < br2*br2){
+          b.bossSegs.push(seg);
+          hurtEnemy(boss, legDmg, false);
+          burst(b.x, b.y, b.z, SHU_COL, 3, 5, 0.6);
+        }
+      }
+      continue;
     }
 
     b.x += b.vx*dt;
@@ -4616,6 +4905,58 @@ function renderBullets(){
   }
   bulB.count = m; bulB.instanceMatrix.needsUpdate = true;
 
+  /* 飞镖：轨迹线 + 黑描边 + 橙体 + 白心。
+     轨迹是按参数方程反算的，不记录历史点 —— 所以无论 15 帧还是 60 帧，
+     那条「扔出去再绕回来」的叶形弧都完整、连续。 */
+  var cN = 0, trN = 0, pkN = 0, tilt = 0.38;
+  for(var ci=0; ci<bulletsC.length && cN < 120; ci++){
+    var b4 = bulletsC[ci];
+    var rot = b4.ang + b4.spinA;
+
+    for(var pk=1; pk<=14; pk++){
+      if(pkN >= 320) break;
+      var uu = b4.u - pk * 0.016;
+      if(uu < 0) break;
+      var ss = Math.sin(Math.PI * uu), ll = Math.sin(TAU * uu) * b4.amp;
+      _dm.position.set(b4.ox + b4.dirx * b4.maxD * ss + b4.sidex * ll, b4.y,
+                       b4.oz + b4.dirz * b4.maxD * ss + b4.sidez * ll);
+      _dm.rotation.set(0, uu * 7, 0);
+      _dm.scale.setScalar((1 - pk/18) * 1.2);
+      _dm.updateMatrix();
+      shuPathPool.setMatrixAt(pkN++, _dm.matrix);
+    }
+
+    for(var t4=1; t4<=2; t4++){
+      if(trN >= 260) break;
+      _dm.position.set(lerp(b4.x, b4.tx, t4*0.42), b4.y, lerp(b4.z, b4.tz, t4*0.42));
+      _dm.rotation.set(tilt, rot - t4*0.5, 0);
+      _dm.scale.setScalar(1.0 - t4*0.2);
+      _dm.updateMatrix();
+      shuTrailPool.setMatrixAt(trN++, _dm.matrix);
+    }
+    _dm.position.set(b4.x, b4.y - 0.05, b4.z);   // 描边压到下面一层，否则和本体共面互相吃掉
+    _dm.rotation.set(tilt, rot, 0);
+    _dm.scale.setScalar(1.0);
+    _dm.updateMatrix();
+    shuOutlinePool.setMatrixAt(cN, _dm.matrix);
+
+    _dm.position.set(b4.x, b4.y, b4.z);
+    _dm.scale.setScalar(1.0);               // 橙体
+    _dm.updateMatrix();
+    shuBodyPool.setMatrixAt(cN, _dm.matrix);
+
+    _dm.position.set(b4.x, b4.y + 0.05, b4.z);
+    _dm.scale.setScalar(1.0);               // 白心
+    _dm.updateMatrix();
+    shuCorePool.setMatrixAt(cN, _dm.matrix);
+    cN++;
+  }
+  shuOutlinePool.count = cN; shuOutlinePool.instanceMatrix.needsUpdate = true;
+  shuBodyPool.count = cN; shuBodyPool.instanceMatrix.needsUpdate = true;
+  shuCorePool.count = cN; shuCorePool.instanceMatrix.needsUpdate = true;
+  shuTrailPool.count = trN; shuTrailPool.instanceMatrix.needsUpdate = true;
+  shuPathPool.count = pkN; shuPathPool.instanceMatrix.needsUpdate = true;
+
   /* 敌弹四层 + 两段拖尾。拖尾位置按速度反推，不需要额外状态。 */
   var q = 0, tr = 0;
   for(var k=0;k<eBullets.length;k++){
@@ -4730,8 +5071,10 @@ function update(dt){
   updateBoss(worldDt);
   updateBulletArr(bullets, worldDt);
   updateBulletArr(bulletsB, worldDt);
+  updateBulletArr(bulletsC, worldDt);
   updateEBullets(worldDt);
   updateSpikes(worldDt);
+  updateSkyArrows(worldDt);
   updateGems(dt);
   updateChests(worldDt);
   updateSpawn(worldDt);
@@ -4749,6 +5092,7 @@ function update(dt){
   renderBullets();
   renderGems();
   renderSpikes();
+  renderSkyArrows();
   pushShadow(hero.x, hero.z, 0.7, 0.4);
   if(boss && !boss.dead) pushShadow(boss.x, boss.z, 2.3, 0.5);
   shadowPool.count = shadowIdx;
@@ -4768,8 +5112,10 @@ var chosenRate = 1.0;
 function initHeroLoadout(){
   hero.speed = 9.2;
   hero.evoId = null;
-  hero.ult = {charge: 0, active: 0, pullT: 0, ang: 0, beamTick: undefined};
+  hero.ult = {charge: 0, active: 0, pullT: 0, ang: 0, beamTick: undefined,
+              rainT: undefined, rainDmg: 0};
   ultQueue.length = 0;
+  skyArrows.length = 0;
   ultBeam.visible = false; ultBeamCore.visible = false; ultRingFx.visible = false;
   if(chosenHero === 'swift'){
     /* 疾风＝射击线：弓 + 射击精通 1 级 */
@@ -4790,8 +5136,10 @@ function initHeroLoadout(){
    （宝箱塞武器、刷新权重、描边参数），不再重复第四次。 */
 function clearWorld(){
   EKEYS.forEach(function(k){ E[k].length = 0; });
-  bullets.length = 0; bulletsB.length = 0; eBullets.length = 0;
+  bullets.length = 0; bulletsB.length = 0; bulletsC.length = 0; eBullets.length = 0;
   gems.length = 0; spikes.length = 0;
+  skyArrows.length = 0; ultQueue.length = 0;
+  ultPunch = 0;
   chests.slice().forEach(function(c){ scene.remove(c.obj); });
   chests.length = 0;
   for(var i=0;i<MAXP;i++) parts[i].on = false;
@@ -5060,7 +5408,7 @@ var CODEX_WROLE = {
   laser:    {role:'远程 · 穿透', note:'一条线打到底，怪物排队时伤害翻倍'},
   scythe:   {role:'近身 · 环绕', note:'贴脸清场，不用瞄准，但必须敢往怪堆里站'},
   bomb:     {role:'投掷 · 范围', note:'抛物线落点爆炸，成堆的怪一次清'},
-  shuriken: {role:'回旋 · 追踪', note:'会绕回来咬人，单点输出高'},
+  shuriken: {role:'回旋 · 双程', note:'划一道弧再收回来，去程回程都打人'},
   spike:    {role:'地面 · 陷阱', note:'铺在身后，边跑边铺，专门对付追兵'}
 };
 
@@ -5405,7 +5753,8 @@ bindOrientUI();
 checkOrient();
 
 window.POW = {
-  S:S, hero:hero, E:E, gems:gems, bullets:bullets, bulletsB:bulletsB,
+  S:S, hero:hero, E:E, gems:gems, bullets:bullets, bulletsB:bulletsB, bulletsC:bulletsC, skyArrows:skyArrows,
+  pools:{shuBody:shuBodyPool, shuOutline:shuOutlinePool, shuCore:shuCorePool, shuPath:shuPathPool, shuTrail:shuTrailPool},
   eBullets:eBullets, chests:chests, spikes:spikes, parts:parts,
   start:startGame, over:gameOver, WDEF:WDEF, PDEF:PDEF,
   gainXP:gainXP, openChest:openChest, buildChest:buildChest, spawnBoss:spawnBoss,
