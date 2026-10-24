@@ -1348,7 +1348,7 @@ function updateCamera(dt, px, pz){
     sx = Math.cos(camShakeT*1.7) * k * 1.25;
     sy = Math.sin(camShakeT*2.3) * k * 0.55;
     sz = Math.cos(camShakeT*2.9) * k * 1.0;
-    camShake -= 1.35 * dt;          // 线性衰减：满值约 0.74 秒回到 0
+    camShake -= 1.50 * dt;          // 线性衰减：满值约 0.67 秒回到 0
     if(camShake < 0) camShake = 0;
   }
 
@@ -1357,7 +1357,25 @@ function updateCamera(dt, px, pz){
 }
 /* 累加而不是取最大值：连炸才会合成一次长震，而不是反复抽动。
    1.0 封顶，防止十几个事件叠成癫痫。 */
-function shake(amt){ camShake = Math.min(1, camShake + amt); }
+/* ── 但「纯线性累加」在后期会失控 ──
+   炸弹 Lv5 一次四颗，每颗都调 shake(0.22)；每杀一只怪还要 shake(0.055)，
+   炸弹清屏一次能死十几只。这些事件加起来每轮超过 1.4，而衰减只有 1.35/秒，
+   于是 trauma 长期贴顶，屏幕从「炸一下」变成「一直在抖」，而且越后期越狠。
+   玩家原话：「丢炸弹丢得越多，屏幕越来越晃」。
+   现在改成「同一批事件边际递减」：
+     · 0.12 秒内发生的事件算同一批
+     · 批内第 2、3、4 次的有效量按 0.55 的幂衰减（0.55 / 0.30 / 0.17）
+     · 再乘一个软饱和，越接近满值越推不动
+   单颗炸弹的手感完全不变（第一发永远是全额），四颗一起炸只是「更闷一点」。 */
+var shakeWinT = -9, shakeWinAmt = 0;
+function shake(amt){
+  var t = S.t || 0;
+  if(t - shakeWinT > 0.12){ shakeWinT = t; shakeWinAmt = 0; }
+  var scale = Math.pow(0.75, shakeWinAmt / 0.30);
+  var use = amt * scale;
+  shakeWinAmt += amt;
+  camShake = Math.min(1, camShake + use * (1 - camShake * 0.25));
+}
 
 /* ─────────── 屏幕特效 ─────────── */
 var flashEl = $('flash'), speedEl = $('speedlines'), tintEl = $('damagetint'), fxEl = $('fx');
@@ -5763,6 +5781,7 @@ window.POW = {
   spawnEnemy:spawnEnemy, spawnGem:spawnGem, ETYPES:ETYPES, camera:camera, renderer:renderer, eMesh:eMesh,
   refreshStats:refreshStats, ARCH:ARCH, PKEYS:PKEYS, ULT:ULT,
   getBoss: function(){ return boss; }, triggerUlt: triggerUlt,
+  getCamShake: function(){ return camShake; },
   getAudio: function(){ return {ac: AC, bgm: BGM, master: masterGain}; },
   get boss(){ return boss; }
 };
