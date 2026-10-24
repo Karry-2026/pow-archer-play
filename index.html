@@ -332,9 +332,17 @@ body.is-title canvas#gl{
 .card:active{transform:translate(3px,3px);box-shadow:2px 2px 0 var(--ink)}
 .card .ic{width:100%;height:64px;border:4px solid var(--ink);border-radius:4px;display:flex;
   align-items:center;justify-content:center;font-family:var(--disp);font-size:21px;letter-spacing:.06em;
-  margin-bottom:9px;position:relative;overflow:hidden}
-.card .ic:after{content:"";position:absolute;inset:0;
-  background:repeating-linear-gradient(-45deg,rgba(10,10,18,.22) 0 5px,transparent 5px 11px)}
+  margin-bottom:9px;position:relative;overflow:hidden;isolation:isolate}
+/* 斜纹是「高光」不是「覆盖」。
+   原来用深色 rgba(10,10,18,.22) 画在 inset:0 上，而伪元素默认绘制在内容之上，
+   正好压在同样深色的图标字上 —— 手机上卡片变小、条纹变密，字被切得看不清。
+   现在两件事一起改：
+     ① 颜色换成白色半透明，做成漫画的分镜高光，不再和黑字抢明度
+     ② 条纹退到 z-index:0，文字用 .ic b 抬到 1，永远压不住字 */
+.card .ic:after{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;
+  background:repeating-linear-gradient(-45deg,rgba(255,255,255,.34) 0 4px,rgba(255,255,255,0) 4px 13px)}
+.card .ic b{position:relative;z-index:1;font-weight:900;
+  text-shadow:1px 1px 0 rgba(255,255,255,.7)}
 .card .nm{font-family:var(--disp);font-size:19px;letter-spacing:.05em;line-height:1}
 .card .kd{font-family:var(--disp);font-size:10px;letter-spacing:.16em;color:#7b2ff7;margin-top:3px}
 .card .gain{font-family:var(--disp);font-size:23px;letter-spacing:.02em;line-height:1.08;color:var(--ink);
@@ -3768,7 +3776,7 @@ function openLevelUp(refresh){
       ds = '回一口血，下一波继续';
     }
     el.innerHTML =
-      '<div class="ic" style="background:'+col+';color:#0a0a12">'+ic+'</div>'+
+      '<div class="ic" style="background:'+col+';color:#0a0a12"><b>'+ic+'</b></div>'+
       '<div class="kd">'+kd+'</div>'+
       '<div class="nm">'+nm+'</div>'+
       '<div class="gain">'+gain+'</div>'+
