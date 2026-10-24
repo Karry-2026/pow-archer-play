@@ -82,169 +82,331 @@ canvas#gl{position:fixed;inset:0;width:100%;height:100%;display:block}
   background-image:radial-gradient(circle,rgba(10,10,18,.14) 1px,transparent 1.3px);
   background-size:6px 6px;opacity:.7}
 .panel>*{position:relative}
-h1.logo{font-family:var(--disp);font-size:clamp(38px,7.4vw,76px);line-height:.86;letter-spacing:.01em;
-  color:var(--paper);-webkit-text-stroke:6px var(--ink);paint-order:stroke fill;
-  text-shadow:7px 7px 0 var(--mag),12px 12px 0 var(--ink);text-align:center}
-h1.logo em{font-style:normal;color:var(--yel);display:block}
-.sub{font-family:var(--disp);font-size:clamp(14px,2.1vw,20px);letter-spacing:.34em;text-align:center;
-  color:var(--cyn);-webkit-text-stroke:3px var(--ink);paint-order:stroke fill;margin-top:6px}
 .tiny{font-size:12px;line-height:1.7;color:#5b5b6b}
 
-/* ── 开始界面 ── */
-/* 标题页：3D 背景虚化压暗，前景卡片才是焦点 */
-body.is-title canvas#gl{
-  filter:blur(2.5px) brightness(.78) saturate(.85);
-  transition:filter .35s ease;
-}
+/* ══════════════════════════════════════════════════════════════════
+   开始界面 v2 · 一刀破开
+   ──────────────────────────────────────────────────────────────────
+   构图：整屏被一条斜切光带分成两块 ——
+     左上「纸面」放标题与射手，右下「墨面」放密度与开始。
+   为什么不做卡片了：卡片是「把东西装进盒子」，两个盒子并排，
+   屏幕一矮就只能一起缩，缩到最后每个字都在挤。
+   整屏切开是另一种思路 —— 把画面分成两个世界，各自有一整块地可用。
 
-/* ── 开始界面── */
-/* 底层压暗：3D 场景退到背景，面板才是焦点 */
+   斜切角度 13°（相对竖直方向）。角度只负责视觉，不参与布局：
+   内容走正交网格，靠内边距让开切线，所以 1440×900 和 844×390
+   共用同一套栅格，不会再出现「按桌面排完、手机上全错位」。
+   ══════════════════════════════════════════════════════════════════ */
+
 #scr-title{
-  justify-content:center;
-  overflow-y:auto;
-  padding:clamp(8px,2vh,22px) 16px;
-  background:radial-gradient(ellipse 96% 78% at 50% 42%,
-    rgba(10,14,32,.32) 0%, rgba(8,10,24,.72) 60%, rgba(8,10,24,.88) 100%);
-}
-
-/* 标题：单行收紧，去掉三层描边 */
-#scr-title .logo{
-  font-size:clamp(28px,5vw,52px);
-  text-shadow:3px 3px 0 var(--mag),6px 6px 0 var(--ink);
-  -webkit-text-stroke:4px var(--ink);
-}
-#scr-title .sub{
-  position:relative; z-index:1;
-  display:inline-block;
-  margin-top:16px;
-  padding:4px 16px;
+  display:block; padding:0; gap:0; overflow:hidden;
   background:var(--ink);
-  color:var(--yel);
-  border:2px solid var(--yel);
-  border-radius:3px;
-  font-size:clamp(10px,1.4vw,12px);
-  letter-spacing:.26em;
-  -webkit-text-stroke:0;
-  text-shadow:none;
+  /* 标题页不需要滚动：所有内容都按视口高度收敛 */
+}
+/* 这里的 display:block 是 ID 选择器，优先级高于 .screen.hide 的 display:none。
+   不补这一条，进游戏之后标题页还盖在 HUD 上面 —— 看上去像卡死。 */
+#scr-title.hide{display:none}
+#scr-title:before,#scr-title:after{display:none}
+
+/* ── 切分：两块底色 + 一条黄色光带 ──
+   切线过 (52%, 50%)，上下两端各横移 11.5vh（tan13° × 半屏高）。
+   两块底色各退让 30px，正好让出光带的宽度，接缝被光带压死。 */
+.tt-split{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.tt-split i{position:absolute;display:block}
+
+.sp-paper{
+  inset:0;
+  background-color:var(--paper);
+  background-image:
+    radial-gradient(ellipse 66% 58% at 20% 14%,rgba(255,255,255,.96),rgba(255,255,255,0) 72%),
+    radial-gradient(circle,rgba(10,10,18,.10) 1px,rgba(10,10,18,0) 1.4px);
+  background-size:100% 100%,6px 6px;
+  clip-path:polygon(0 0,
+    calc(52% - 11.5vh - 30px) 0,
+    calc(52% + 11.5vh - 30px) 100%,
+    0 100%);
+}
+.sp-ink{
+  inset:0;
+  background-color:var(--ink);
+  background-image:
+    radial-gradient(ellipse 82% 72% at 78% 20%,rgba(48,34,92,.92),rgba(8,9,18,0) 70%),
+    radial-gradient(circle,rgba(255,246,233,.07) 1px,rgba(255,246,233,0) 1.4px);
+  background-size:100% 100%,7px 7px;
+  clip-path:polygon(calc(52% - 11.5vh + 30px) 0,
+    100% 0,100% 100%,
+    calc(52% + 11.5vh + 30px) 100%);
+}
+/* 光带本体：7px 墨边 + 46px 黄芯 */
+.sp-slash{
+  left:calc(52% - 30px); top:-40%; bottom:-40%; width:60px;
+  background:linear-gradient(180deg,#fffbe0,var(--yel) 18%,var(--yel) 82%,#fffbe0);
+  border:7px solid var(--ink);
+  transform:rotate(-13deg);
+  box-shadow:0 0 30px rgba(255,230,0,.45);
+}
+/* 第二道细光：刀锋残影。让「切开」像一个动作，而不是一条分割线 */
+.sp-echo{
+  left:calc(52% + 16px); top:-40%; bottom:-40%; width:4px;
+  background:rgba(255,230,0,.5);
+  transform:rotate(-13deg);
 }
 
-/* 主体：左设置 / 右说明，两列平行 */
-.t-body{
-  flex:0 1 auto; min-height:0;
-  display:flex; gap:14px; align-items:stretch;
-  width:100%; max-width:min(1160px,95vw);
-  margin:clamp(8px,1.6vh,16px) 0;
+/* ── 栅格 ── */
+.tt-grid{
+  position:relative; z-index:1; height:100%;
+  display:grid;
+  grid-template-columns:minmax(0,48fr) minmax(0,52fr);
+  grid-template-rows:auto 1fr auto;
+  gap:clamp(6px,1.4vh,16px) 0;
+  padding:clamp(12px,2.4vh,26px) clamp(16px,2.6vw,44px) clamp(10px,2vh,22px);
 }
-.t-col{
-  border:5px solid var(--ink); border-radius:6px;
-  box-shadow:8px 8px 0 var(--ink);
-  padding:clamp(16px,1.7vw,26px) clamp(18px,2vw,32px);
-  display:flex; flex-direction:column; min-height:0;
+.tt-head{grid-column:1; grid-row:1; padding-right:clamp(40px,7vh,90px)}
+.tt-hero{
+  grid-column:1; grid-row:2; min-height:0;
+  padding-right:clamp(24px,5vh,70px);
+  display:flex; flex-direction:column; justify-content:center;
+}
+.tt-rate{
+  grid-column:2; grid-row:2; min-height:0;
+  /* 右列必须避开斜切线。切线越往下越往右，
+     所以内容贴顶排（那一段墨面最宽），内边距按最下面那个控件的安全距离取。
+     90px 是 844×390 实测的下限，10vw 是 1440×900 的下限，取两者覆盖的包络。 */
+  padding-left:clamp(104px,10vw,170px);
+  display:flex; flex-direction:column; justify-content:flex-start;
+}
+/* 玩法速览：用 margin-bottom:auto 顶到墨面上半区，
+   和贴底的「密度 + 开始」分成两块 —— 上面是读的，下面是点的 */
+.tt-how{
+  margin:clamp(10px,2.4vh,26px) 0 0; display:flex; flex-direction:column;
+  gap:clamp(7px,1.5vh,14px); max-width:min(430px,100%);
+  padding-top:clamp(9px,2vh,18px); border-top:2px dashed rgba(255,246,233,.16);
+}
+.tt-how div{display:flex; gap:12px; align-items:baseline}
+.tt-how b{
+  flex:0 0 42px; font-family:var(--disp); font-size:clamp(10px,1vw,13px);
+  letter-spacing:.16em; color:var(--yel);
+}
+.tt-how span{font-size:clamp(10px,.95vw,12.5px); line-height:1.5; color:#a9a5bf}
+.tt-foot{
+  grid-column:2; grid-row:3;
+  padding-left:calc(4% + 34px);
+  display:flex; gap:clamp(8px,1vh,14px);
+  justify-content:flex-end; align-items:stretch;
+}
+.tt-ticker{
+  grid-column:1; grid-row:3; align-self:end;
+  padding-right:clamp(24px,5vh,70px);
+  display:flex; flex-wrap:wrap; align-items:center;
+  font-family:var(--disp); font-size:clamp(8.5px,.82vw,11px);
+  letter-spacing:.16em; color:#55555f;
+}
+.tt-ticker span+span:before{content:"／"; margin:0 8px; color:#b9bcc6}
+
+/* ── 标题 ── */
+.tt-logo{margin:0; font-family:var(--disp); line-height:.8; color:var(--ink); letter-spacing:.01em}
+.tt-logo s{
+  display:block; text-decoration:none;
+  font-size:clamp(10px,1.25vw,17px); letter-spacing:.46em; color:var(--mag);
+  margin-bottom:.5em;
+}
+.tt-logo b{
+  display:block; font-size:clamp(34px,6.6vw,96px);
+  text-shadow:5px 5px 0 var(--yel), 9px 9px 0 var(--ink);
+}
+.tt-tag{
+  display:inline-block; margin-top:.95em; padding:3px 9px;
+  background:var(--ink); color:var(--yel);
+  font-family:var(--disp); font-size:clamp(9px,1vw,12px); letter-spacing:.26em;
+  transform:skewX(-10deg);
 }
 
-/* 左列：白底，这里要你动手 */
-.t-setup{
-  flex:1 1 56%; background:var(--paper); color:var(--ink);
-  transform:skewX(-1deg);
-  justify-content:center;
+/* ── 步骤标签 ── */
+.tt-lab{
+  display:flex; align-items:center; gap:9px;
+  margin:0 0 clamp(6px,1.2vh,12px);
+  font-family:var(--disp); font-size:clamp(13px,1.35vw,18px);
+  letter-spacing:.22em; color:var(--ink);
 }
-.t-setup > *{flex:0 0 auto}
-
-/* 右列：深底，这里只需要读 */
-.t-howto{flex:1 1 44%; max-width:375px; background:var(--ink); color:var(--paper)}
-.t-howhead{
-  font-family:var(--disp); font-size:13px; letter-spacing:.3em;
-  color:var(--yel); border-bottom:3px solid rgba(255,246,233,.26);
-  padding-bottom:8px; margin-bottom:6px;
-}
-.t-howto > *{flex:0 0 auto}
-.t-rows{display:flex; flex-direction:column; gap:15px; flex:1 1 auto;
-  justify-content:space-evenly}
-.t-row{display:flex; gap:10px; align-items:flex-start; font-size:clamp(12.5px,1.05vw,15px); line-height:1.55}
-.t-row b{
-  flex:0 0 44px; font-family:var(--disp); font-size:13px;
-  letter-spacing:.14em; color:var(--cyn);
-}
-.t-row span{color:#cfd4dd; min-width:0}
-.t-keys{
-  margin-top:auto; padding-top:12px;
-  border-top:2px dashed rgba(255,246,233,.18);
-  font-size:10px; letter-spacing:.14em; color:#8a8a9a; text-align:center;
-}
-
-/* 步骤序号：让“先选什么后选什么”一目了然 */
-.t-step{display:flex; align-items:center; gap:9px; margin-bottom:11px}
-.t-step + .t-step, .t-step.mt{margin-top:20px}
-.t-step i{
-  flex:0 0 25px; width:25px; height:25px; border-radius:50%;
+.tt-lab i{
+  font-style:normal; padding:1px 7px;
   background:var(--mag); color:#fff; border:3px solid var(--ink);
-  font-family:var(--disp); font-style:normal; font-size:14px;
-  display:flex; align-items:center; justify-content:center;
+  font-size:.82em; letter-spacing:.06em; transform:skewX(-10deg);
 }
-.t-step b{font-family:var(--disp); font-size:clamp(15px,1.2vw,18px); letter-spacing:.16em}
-.t-step s{
-  text-decoration:none; font-size:11px; color:#7a7a8a;
-  margin-left:10px; white-space:nowrap;
+.tt-rate .tt-lab{color:var(--paper)}
+.tt-rate .tt-lab i{border-color:var(--paper)}
+/* 标签尾部的小注：靠右，把「这一块是干什么的」一次说清 */
+.tt-lab s{
+  margin-left:auto; text-decoration:none;
+  font-family:var(--ui); font-weight:700;
+  font-size:clamp(9px,.78vw,10.5px); letter-spacing:.1em;
+  color:#8c88a4; white-space:nowrap;
 }
 
-/* 角色卡：两列对齐，不再一个大一个小 */
-.pickrow{display:grid; grid-template-columns:1fr 1fr; gap:10px}
-.pick{
-  display:flex; gap:12px; align-items:flex-start;
-  padding: 10px 12px 13px;
-  background:#fff; color:var(--ink);
-  border:4px solid var(--ink); border-radius:5px;
-  padding:clamp(12px,1.2vw,18px) clamp(13px,1.3vw,19px); cursor:pointer;
-  transition:transform .1s, box-shadow .1s;
-  box-shadow:4px 4px 0 var(--ink);
+/* ── 射手卡：漫画分格，选中整块翻成黄色 ── */
+#scr-title .pickrow{display:grid; grid-template-columns:1fr; gap:clamp(9px,1.6vh,18px)}
+#scr-title .pick{
+  position:relative; display:grid; grid-template-columns:auto minmax(0,1fr) auto;
+  align-items:center; gap:clamp(10px,1.4vw,18px);
+  min-height:clamp(76px,11.5vh,124px);
+  background:#fff; color:var(--ink); border:4px solid var(--ink); border-radius:0;
+  padding:clamp(10px,1.6vh,18px) clamp(12px,1.2vw,18px) clamp(10px,1.6vh,18px) clamp(16px,1.5vw,22px);
+  box-shadow:6px 6px 0 var(--ink); cursor:pointer; overflow:hidden;
+  transition:transform .12s cubic-bezier(.2,1.4,.4,1), box-shadow .12s, background .12s;
 }
-.pick:hover{transform:translate(-2px,-2px); box-shadow:6px 6px 0 var(--ink)}
-.pick.on{background:var(--yel); box-shadow:4px 4px 0 var(--mag)}
-.pico{
-  flex:0 0 clamp(38px,3.4vw,50px); width:clamp(38px,3.4vw,50px);
-  height:clamp(38px,3.4vw,50px); border-radius:50%;
+#scr-title .pick:before{
+  content:""; position:absolute; left:0; top:0; bottom:0; width:6px;
+  background:var(--pcol,#7b2ff7);
+}
+#scr-title .pick:hover{transform:translate(-2px,-2px); box-shadow:8px 8px 0 var(--ink)}
+#scr-title .pick.on{background:var(--yel); box-shadow:6px 6px 0 var(--mag),0 0 0 3px var(--ink)}
+#scr-title .pico{
+  flex:0 0 auto; display:flex; align-items:center; justify-content:center;
+  width:clamp(40px,4.6vw,66px); height:clamp(40px,4.6vw,66px);
   border:3px solid var(--ink); color:#0a0a12;
-  display:flex; align-items:center; justify-content:center;
-  font-family:var(--disp); font-size:clamp(19px,1.7vw,25px); line-height:1;
+  font-family:var(--disp); font-size:clamp(20px,2.4vw,34px); line-height:1;
+  transform:skewX(-8deg);
 }
-.ptxt{min-width:0; flex:1 1 auto}
-.pick b{display:block; font-size:clamp(17px,1.45vw,22px); font-weight:800; line-height:1.2}
-.pick s{display:block; text-decoration:none; color:#4a4a58;
-  margin-top:5px; line-height:1.55; font-size:clamp(11.5px,1vw,13.5px)}
-.pick .tagline{
-  display:inline-block; margin-top:6px;
-  font-family:var(--disp); font-size:9px; letter-spacing:.12em;
-  background:var(--ink); color:var(--yel); padding:1px 6px; border-radius:2px;
+#scr-title .ptxt{min-width:0}
+#scr-title .pick b{
+  display:block; font-family:var(--disp);
+  font-size:clamp(16px,1.8vw,26px); letter-spacing:.1em; line-height:1.15;
 }
-
-/* 开始按钮：占一行，不再跟其他控件挤 */
-.startbig{
-  flex:0 0 auto;
-  font-size:clamp(20px,3.2vw,32px);
-  padding:13px 62px;
-  margin-top:clamp(10px,2vh,20px);
-  animation:pulseBtn 2.6s ease-in-out infinite;
+#scr-title .pick s{
+  display:block; text-decoration:none; margin-top:4px; color:#4a4a58;
+  font-size:clamp(10px,1.05vw,14px); line-height:1.55;
 }
-@keyframes pulseBtn{
-  0%,100%{box-shadow:8px 8px 0 var(--ink)}
-  50%{box-shadow:8px 8px 0 var(--ink), 0 0 0 7px rgba(255,46,136,.22)}
-}
-#scr-title .hint{margin-top:clamp(6px,1.2vh,12px); font-size:10px; color:#b9c0cc}
-
-/* 窄屏 / 竖屏：两列改单列 */
-@media (max-width: 860px){
-  .t-body{flex-direction:column; gap:10px; overflow-y:auto}
-  .t-howto{max-width:none}
-  .t-rows{flex-direction:row; flex-wrap:wrap; gap:6px 14px}
-  .t-row b{flex:0 0 32px}
+/* 标签原来塞在文字下面，把卡片撑高、右边留空；
+   现在挪到最右一栏，横向铺满，读起来像漫画的角色卡条 */
+#scr-title .pick .tagline{
+  justify-self:end; padding:3px 8px;
+  background:var(--ink); color:var(--yel);
+  font-family:var(--disp); font-size:clamp(8px,.8vw,11px); letter-spacing:.12em;
+  white-space:nowrap;
 }
 
-.rate{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
-.rate button{flex:1 1 70px;font-family:var(--ui);font-weight:800;font-size:14px;padding:14px 6px;
-  background:#fff;color:var(--ink);border:3px solid var(--ink);border-radius:4px;cursor:pointer;
-  box-shadow:3px 3px 0 var(--ink)}
-.rate button.on{background:var(--cyn);box-shadow:3px 3px 0 var(--mag)}
-.rate button:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--ink)}
+/* ── 密度：墨面上的 2×2 描边按钮 ── */
+#scr-title .rate{
+  display:grid; grid-template-columns:1fr 1fr; gap:clamp(6px,1vh,10px);
+  background:none; border:0; border-radius:0; padding:0; overflow:visible;
+}
+#scr-title .rate button{
+  flex:none; padding:clamp(8px,1.8vh,16px) 4px;
+  background:transparent; color:var(--paper);
+  border:3px solid rgba(255,246,233,.5); border-radius:0;
+  font-family:var(--disp); font-size:clamp(12px,1.25vw,17px); letter-spacing:.18em;
+  cursor:pointer; box-shadow:none; transition:all .12s;
+}
+#scr-title .rate button:hover{background:rgba(255,246,233,.12); border-color:var(--paper)}
+#scr-title .rate button.on{
+  background:var(--yel); color:var(--ink); border-color:var(--ink);
+  box-shadow:4px 4px 0 var(--mag); transform:translate(-1px,-1px);
+}
+
+/* ── 底部动作 ── */
+.tt-foot .startbig{
+  flex:0 1 auto; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:2px; line-height:1.05;
+  background:var(--yel); color:var(--ink);
+  border:4px solid var(--ink); border-radius:0;
+  padding:clamp(8px,1.5vh,14px) clamp(18px,2.6vw,40px);
+  font-family:var(--disp); cursor:pointer;
+  animation:pulseCut 2.6s ease-in-out infinite;
+}
+.tt-foot .sbt{font-size:clamp(17px,2vw,27px); letter-spacing:.2em}
+.tt-foot .sbs{
+  font-family:var(--ui); font-weight:700;
+  font-size:clamp(8px,.78vw,10px); letter-spacing:.1em; opacity:.68;
+}
+@keyframes pulseCut{
+  0%,100%{box-shadow:7px 7px 0 var(--mag)}
+  50%{box-shadow:7px 7px 0 var(--mag),0 0 0 8px rgba(255,230,0,.16)}
+}
+.tt-foot .codexbtn{
+  flex:0 0 auto; background:transparent; color:var(--paper);
+  border:4px solid var(--paper); border-radius:0;
+  font-family:var(--disp); font-size:clamp(12px,1.15vw,16px); letter-spacing:.18em;
+  padding:0 clamp(12px,1.5vw,20px); cursor:pointer;
+  box-shadow:5px 5px 0 rgba(255,246,233,.2); transition:all .1s;
+}
+.tt-foot .codexbtn:hover{background:var(--paper); color:var(--ink)}
+.tt-foot .codexbtn:active{transform:translate(3px,3px); box-shadow:2px 2px 0 rgba(255,246,233,.2)}
+
+/* 分段控件（暂停菜单的密度选择仍用这套朴素版，#scr-title 内部会覆盖） */
+.rate{
+  display:flex; gap:0; background:#e8e4dc; border:3px solid var(--ink);
+  border-radius:9px; padding:3px; overflow:hidden;
+}
+.rate button{
+  flex:1 1 0; border:none; background:transparent; border-radius:6px;
+  padding:9px 4px; font-family:var(--ui); font-weight:800; font-size:13px;
+  color:#5a5a68; cursor:pointer; letter-spacing:.04em;
+  transition:background .12s,color .12s;
+}
+.rate button:hover{background:#d8d3c8; color:var(--ink)}
+.rate button.on{background:var(--ink); color:var(--yel); box-shadow:2px 2px 0 rgba(10,10,18,.35)}
+
+/* ── 手机横屏：整体降一档，斜切保留 ── */
+@media (max-height: 520px){
+  .tt-grid{padding:8px 14px 8px; gap:5px 0}
+  .tt-logo b{font-size:clamp(24px,5.4vw,36px); text-shadow:3px 3px 0 var(--yel),5px 5px 0 var(--ink)}
+  .tt-logo s{font-size:9px; letter-spacing:.3em; margin-bottom:.3em}
+  .tt-tag{margin-top:.55em; font-size:9px; padding:2px 7px; letter-spacing:.2em}
+  .tt-lab{font-size:12px; margin-bottom:6px; gap:6px}
+  .tt-lab i{border-width:2px; padding:0 5px}
+  #scr-title .pick{padding:6px 10px 6px 14px; border-width:3px; box-shadow:4px 4px 0 var(--ink); min-height:0}
+  #scr-title .pick.on{box-shadow:4px 4px 0 var(--mag),0 0 0 2px var(--ink)}
+  #scr-title .pick:before{width:5px}
+  #scr-title .pico{width:34px; height:34px; font-size:17px; border-width:2px}
+  #scr-title .pick b{font-size:15px}
+  #scr-title .pick s{font-size:9.5px; margin-top:2px; line-height:1.35}
+  #scr-title .pickrow{gap:7px}
+  #scr-title .pick .tagline{font-size:8px; margin-top:3px; padding:0 4px}
+  #scr-title .rate button{padding:6px 3px; font-size:11px; border-width:2px; letter-spacing:.1em}
+  .tt-how{display:none}
+  .tt-lab s{display:none}
+  /* 手机上墨面只有 260px 高：贴顶会在中间留一大块黑，
+     贴底又和「开始」挤成一坨。居中让空档分到上下两头，最均衡。 */
+  .tt-rate{justify-content:center}
+  .tt-foot .startbig{padding:6px 18px; border-width:3px}
+  .tt-foot .sbt{font-size:16px; letter-spacing:.18em}
+  .tt-foot .sbs{display:none}
+  .tt-foot .codexbtn{font-size:12px; border-width:3px; padding:0 12px}
+  .tt-ticker{font-size:8px; letter-spacing:.1em; line-height:1.7}
+}
+
+/* ── 竖屏 / 极窄：斜切改成横向切，纸面在上、墨面在下 ── */
+@media (max-width: 700px){
+  .sp-paper{clip-path:polygon(0 0,100% 0,100% calc(44% - 30px),0 calc(44% - 30px))}
+  .sp-ink{clip-path:polygon(0 calc(44% + 30px),100% calc(44% + 30px),100% 100%,0 100%)}
+  /* 竖屏的切分是横着的，光带不能带角度 ——
+     带 2° 之后两端和上下两块底色错开十几像素，接缝会漏出一条暗边。 */
+  .sp-slash{
+    left:0; right:0; top:calc(44% - 30px); bottom:auto; height:60px; width:auto;
+    transform:none;
+  }
+  /* 必须写到 .tt-split .sp-echo：上面那条 .tt-split i{display:block}
+     是「1 类 + 1 标签」，单写 .sp-echo 压不住它。 */
+  .tt-split .sp-echo{display:none}
+  .tt-grid{
+    grid-template-columns:1fr;
+    grid-template-rows:auto auto auto auto;
+    gap:clamp(4px,1vh,10px) 0;
+    overflow-y:auto;
+  }
+  .tt-head,.tt-hero,.tt-rate,.tt-foot,.tt-ticker{
+    grid-column:1; padding-left:0; padding-right:0;
+  }
+  .tt-head{grid-row:1}
+  .tt-hero{grid-row:2; padding-right:0}
+  .tt-rate{grid-row:3; padding-left:0}
+  .tt-foot{grid-row:4; justify-content:center; padding-left:0}
+  .tt-ticker{display:none}
+  .tt-logo b{font-size:clamp(26px,8vw,44px)}
+  #scr-title .pickrow{gap:8px}
+  .tt-body-fill{display:none}
+}
+
 .sechead{font-family:var(--disp);font-size:13px;letter-spacing:.22em;color:var(--ink);
   border-bottom:3px solid var(--ink);padding-bottom:4px;margin:14px 0 8px;display:flex;
   justify-content:space-between;align-items:baseline}
@@ -291,7 +453,9 @@ body.is-title canvas#gl{
   transition:width .12s}
 .hpbar:after{content:"";position:absolute;inset:0;
   background:repeating-linear-gradient(90deg,transparent 0 12px,rgba(10,10,18,.35) 12px 14px)}
-.hud-right{text-align:right;justify-self:end;display:flex;flex-direction:column;align-items:flex-end;gap:9px}
+/* 静音按钮钉在右上角，击杀数往下一档，避免压在同一块 */
+.hud-right{text-align:right;justify-self:end;display:flex;flex-direction:column;
+  align-items:flex-end;gap:9px;padding-top:52px}
 .lvbadge{display:inline-block;background:var(--yel);color:var(--ink);border:4px solid var(--ink);
   padding:3px 12px;transform:skewX(-8deg);box-shadow:4px 4px 0 rgba(10,10,18,.55);
   font-family:var(--disp);font-size:17px;letter-spacing:.08em}
@@ -518,8 +682,12 @@ body.is-title canvas#gl{
   50%{filter:drop-shadow(0 0 12px rgba(255,230,0,.95))}
 }
 
-#audiobox{position:fixed;left:12px;top:72px;z-index:28;display:flex;flex-direction:column;
-  align-items:flex-start;gap:5px}
+/* 音频控件原来在桌面是「左上角往下 72px」、手机是「右上角」，
+   两套位置各自让位，结果两边都得为它留白。
+   现在统一钉在右上角：标题页正好与左上角的标题形成对角，
+   游戏内则把右上角的击杀数往下让，只在一处妥协。 */
+#audiobox{position:fixed;right:14px;top:14px;z-index:28;display:flex;flex-direction:column;
+  align-items:flex-end;gap:5px}
 #mutebtn{width:46px;height:46px;border-radius:9px;border:3px solid var(--ink);
   background:var(--yel);color:var(--ink);display:flex;align-items:center;justify-content:center;
   cursor:pointer;box-shadow:4px 4px 0 rgba(10,10,18,.6);transition:background .15s,color .15s,transform .07s}
@@ -535,7 +703,7 @@ body.is-title canvas#gl{
   padding:3px 9px;background:var(--ink);color:var(--paper);border:2px solid var(--paper);
   border-radius:4px;cursor:pointer;box-shadow:3px 3px 0 rgba(10,10,18,.55)}
 #volbtn:hover{border-color:var(--yel);color:var(--yel)}
-#volpanel{position:absolute;left:56px;top:0;width:206px;background:rgba(10,10,18,.97);
+#volpanel{position:absolute;right:56px;top:0;width:206px;background:rgba(10,10,18,.97);
   border:3px solid var(--paper);border-radius:6px;padding:12px 13px;display:flex;
   flex-direction:column;gap:11px;box-shadow:7px 7px 0 rgba(10,10,18,.55)}
 #volpanel.hide{display:none}
@@ -563,46 +731,6 @@ body.is-title canvas#gl{
    这一段只做一件事：纵向空间不够时，把信息量减掉，而不是缩小。
    ═══════════════════════════════════════════════════════════ */
 @media (max-height: 520px){
-
-  /* ── 标题页：两栏卡片 → 三行紧凑 ── */
-  #scr-title{padding:6px 12px; gap:0}
-  #scr-title .logo{font-size:32px;
-    text-shadow:2px 2px 0 var(--mag),5px 5px 0 var(--ink);
-    -webkit-text-stroke:3px var(--ink)}
-  #scr-title .sub{display:none}          /* 副标题在 390 高里不值那 26px */
-  #scr-title .hint{display:none}
-
-  .t-body{gap:8px; margin:5px 0; max-width:none; flex:1 1 auto}
-  .t-howto{display:none}                  /* 玩法速览是阅读内容，手机上折叠 */
-  .t-setup{flex:1 1 100%; padding:8px 12px; transform:none;
-    border-width:3px; box-shadow:5px 5px 0 var(--ink)}
-
-  .t-step{margin-bottom:6px; gap:6px}
-  .t-step + .t-step{margin-top:8px}
-  .t-step i{flex:0 0 19px; width:19px; height:19px; font-size:11px; border-width:2px}
-  .t-step b{font-size:13px; letter-spacing:.1em}
-  .t-step s{font-size:10px; margin-left:6px}
-
-  .pickrow{gap:7px}
-  .pick{padding:6px 9px; gap:8px; border-width:3px; box-shadow:3px 3px 0 var(--ink)}
-  .pick.on{box-shadow:3px 3px 0 var(--mag)}
-  .pico{flex:0 0 28px; width:28px; height:28px; font-size:14px; border-width:2px}
-  .pick b{font-size:14px}
-  .pick s{font-size:10px; margin-top:2px; line-height:1.3}
-  .pick .tagline{font-size:8px; padding:0 4px; margin-top:3px}
-
-  .rate{gap:6px; margin-top:2px}
-  .rate button{padding:7px 4px; font-size:12px; border-width:2px;
-    box-shadow:2px 2px 0 var(--ink)}
-
-  .startbig{font-size:20px; padding:8px 40px; margin-top:7px;
-    border-width:4px; box-shadow:5px 5px 0 var(--ink)}
-  #scr-title .startbig{animation:none}
-
-  /* ── 超武蓄力环：缩小并挪进右下角 ── */
-  #ultbox{width:72px;height:72px;left:10px;bottom:30px}
-  #ultbox .ucore b{font-size:10px;max-width:56px}
-  #ultbox .ucore s{font-size:8px}
 
   /* ── 音频控件：矮屏只留静音图标，音量面板收进暂停菜单 ── */
   #audiobox{left:auto; right:10px; top:8px; flex-direction:row; gap:5px}
@@ -638,13 +766,15 @@ body.is-title canvas#gl{
   .lvbadge{font-size:12px; padding:1px 8px; border-width:3px; box-shadow:3px 3px 0 rgba(10,10,18,.45)}
   .kills{font-size:9px; letter-spacing:.1em}
 
-  /* 底部：超武环 / 背包按钮 / 武器槽 / 经验条，四块各占一段，互不叠 */
-  #ultbox{width:62px;height:62px;left:8px;bottom:22px}
-  /* 62px 的环里放不下四个汉字，手机上只留百分比 */
+  /* 底部：背包居中、武器槽在右下排成一排、超武按钮压在它们上面。
+     超武按钮从「左下角」挪到「右下角」——
+     手机的主流握法是左手划屏移动、右手点技能，放左下等于让右手横穿整个屏幕。 */
+  #ultbox{width:78px;height:78px;left:auto;right:12px;bottom:54px}
+  /* 78px 的环里放不下四个汉字，手机上只留百分比 / 点我 */
   #ultbox .ucore b{display:none}
-  #ultbox .ucore s{font-size:11px; letter-spacing:.02em}
-  #bagbtn{font-size:11px; padding:3px 12px; bottom:20px}
-  #slots{gap:5px; right:8px; bottom:16px}
+  #ultbox .ucore s{font-size:12px; letter-spacing:.02em}
+  #bagbtn{font-size:11px; padding:3px 12px; bottom:16px}
+  #slots{gap:5px; right:100px; bottom:14px}
   .slot{width:32px; height:32px; border-width:2px; font-size:10px}
   .slot .pips u{width:4px; height:2px}
   .xpwrap{padding:0 8px}
@@ -652,29 +782,8 @@ body.is-title canvas#gl{
   .xpbar span{font-size:8px; letter-spacing:.12em}
 }
 
-/* 更矮的（部分安卓机 360 高）：再砍一档 */
-@media (max-height: 400px){
-  #scr-title .logo{font-size:27px}
-  .t-setup{padding:6px 9px}
-  .pickrow{gap:6px}
-  .pick{padding:5px 7px}
-  .pico{flex:0 0 24px; width:24px; height:24px; font-size:12px}
-  .pick b{font-size:13px}
-  .pick s{font-size:9px}
-  .pick .tagline{display:none}
-  .startbig{font-size:18px; padding:7px 34px}
-}
-
 /* 矮屏补充：升级页与经验条 */
 @media (max-height: 520px){
-  /* 主页：矮屏下白卡别再按比例撑满，否则内容只有三行、下方空一大块 */
-  .t-body{ align-items: flex-start; flex: 0 0 auto; }
-  .t-setup{ flex: 0 0 auto; width: 100%; justify-content: flex-start; }
-  /* 标题在 390 高里会被顶边裁掉，收字号 + 缩小字距 */
-  #scr-title{ padding-top: 5px; gap: 7px; }
-  #scr-title .logo{ font-size: 24px; line-height: 1.02; }
-  .t-howto{ display: none; }
-  .pick{ padding: 7px 10px 9px; }
 
   /* 升级三选一：卡片纵向压扁，否则「重掷」按钮会被挤出屏幕 */
   #scr-level{gap:6px; padding:6px 10px}
@@ -695,89 +804,6 @@ body.is-title canvas#gl{
   .xpbar{height:8px; border-top-width:2px}
   .xpbar span{font-size:8px; letter-spacing:.1em}
 }
-
-/* ══════════ 主页视觉升级 ══════════
-   原来所有卡都是 5px 圆角 + skew 斜切，堆在一起像老式街机面板。
-   现在统一成 12px 圆角、双层投影、明确的卡片边界，斜切只保留在标题上。 */
-.t-setup{
-  border-radius: 14px;
-  transform: none;
-  box-shadow: 8px 8px 0 rgba(10,10,18,.62), 0 0 0 1px rgba(10,10,18,.08) inset;
-  padding: clamp(12px,1.6vh,18px) clamp(13px,1.6vw,20px);
-}
-.t-howto{
-  border-radius: 14px;
-  box-shadow: 8px 8px 0 rgba(10,10,18,.62);
-  /* 右栏是一块深色磨砂板，让两栏一眼分得开 */
-  background: linear-gradient(160deg, rgba(16,18,34,.94), rgba(10,11,22,.97));
-  border-color: rgba(255,246,233,.22);
-}
-.t-rows{gap:14px}
-.t-row{
-  padding-bottom: 11px;
-  border-bottom: 1px dashed rgba(255,246,233,.14);
-}
-.t-row:last-child{border-bottom:none; padding-bottom:0}
-
-/* 角色卡：加左侧色条，选中的卡整张变亮 */
-.pick{
-  border-radius: 11px;
-  box-shadow: 4px 4px 0 rgba(10,10,18,.55);
-  transition: transform .12s cubic-bezier(.2,1.4,.4,1), box-shadow .12s, background .12s;
-  position: relative; overflow: hidden;
-}
-.pick::before{
-  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 6px;
-  background: var(--pcol, #7b2ff7);
-}
-.pick.on{ background: #fff; box-shadow: 4px 4px 0 var(--mag), 0 0 0 3px var(--ink) }
-.pick:hover{ transform: translate(-1px,-2px); box-shadow: 6px 6px 0 rgba(10,10,18,.55) }
-
-/* 密度：从四个按钮改成一条分段控件，选中项填满深色 */
-.rate{
-  display: flex; gap: 0; background: #e8e4dc; border: 3px solid var(--ink);
-  border-radius: 9px; padding: 3px; overflow: hidden;
-}
-.rate button{
-  flex: 1 1 0; border: none; background: transparent; border-radius: 6px;
-  padding: 9px 4px; font-family: var(--ui); font-weight: 800; font-size: 13px;
-  color: #5a5a68; cursor: pointer; transition: background .12s, color .12s;
-  letter-spacing: .04em;
-}
-.rate button:hover{ background: #d8d3c8; color: var(--ink) }
-.rate button.on{
-  background: var(--ink); color: var(--yel);
-  box-shadow: 2px 2px 0 rgba(10,10,18,.35);
-}
-
-/* 底部动作区 */
-.t-actions{
-  display: flex; gap: 10px; align-items: stretch;
-  width: 100%; max-width: min(1160px, 95vw);
-  margin-top: clamp(8px, 1.4vh, 14px);
-}
-.startbig{
-  flex: 1 1 auto;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 3px; line-height: 1.1;
-  border-radius: 12px !important;
-}
-.startbig .sbt{ font-size: clamp(20px, 2.2vw, 30px); letter-spacing: .16em }
-.startbig .sbs{
-  font-family: var(--ui); font-weight: 700; font-size: 10px;
-  letter-spacing: .14em; opacity: .72;
-}
-.codexbtn{
-  flex: 0 0 auto; min-width: 122px;
-  border-radius: 12px !important;
-  background: #fff; color: var(--ink);
-  font-size: clamp(14px, 1.2vw, 17px); letter-spacing: .14em;
-  border: 4px solid var(--ink); cursor: pointer;
-  box-shadow: 6px 6px 0 rgba(10,10,18,.6);
-  transition: transform .1s, box-shadow .1s;
-}
-.codexbtn:hover{ background: var(--yel) }
-.codexbtn:active{ transform: translate(3px,3px); box-shadow: 3px 3px 0 rgba(10,10,18,.6) }
 
 /* ══════════ 图鉴 ══════════ */
 #scr-codex{
@@ -973,45 +999,51 @@ body.is-title canvas#gl{
   </div>
 </div>
 
-<!-- ══ 开始界面 ══ -->
+<!-- ══ 开始界面：一刀破开 ══ -->
 <div id="scr-title" class="screen">
-  <header class="t-top">
-    <h1 class="logo">爆裂<em>弓箭手</em></h1>
-    <div class="sub">十波死斗 · 两大异兽</div>
-  </header>
+  <!-- 切分背景：纸面 / 墨面 / 光带。纯装饰，不接任何交互 -->
+  <div class="tt-split" aria-hidden="true">
+    <i class="sp-paper"></i>
+    <i class="sp-ink"></i>
+    <i class="sp-echo"></i>
+    <i class="sp-slash"></i>
+  </div>
 
-  <div class="t-body">
-    <!-- 左：需要你点的 -->
-    <section class="t-col t-setup">
-      <div class="t-step"><i>1</i><b>选择射手</b><s>两种起手，两种流派</s></div>
+  <div class="tt-grid">
+    <header class="tt-head">
+      <h1 class="tt-logo"><s>POW!&nbsp;ARCHER</s><b>爆裂弓箭手</b></h1>
+      <div class="tt-tag">十波死斗 · 两大异兽</div>
+    </header>
+
+    <section class="tt-hero">
+      <h2 class="tt-lab"><i>01</i>选择射手</h2>
       <div class="pickrow" id="heroes"></div>
-
-      <div class="t-step"><i>2</i><b>刷怪密度</b><s>局内暂停还能再调</s></div>
-      <div class="rate" id="rates"></div>
     </section>
 
-    <!-- 右：只需要看的 -->
-    <aside class="t-col t-howto">
-      <div class="t-howhead">玩法速览</div>
-      <div class="t-rows">
-        <div class="t-row"><b>移动</b><span>WASD 或方向键；触屏按住屏幕任意位置滑动</span></div>
-        <div class="t-row"><b>攻击</b><span>全自动，自己锁最近的敌人</span></div>
-        <div class="t-row"><b>升级</b><span>三选一，武器满级可进化超武</span></div>
-        <div class="t-row"><b>宝箱</b><span>开出随机武器与被动</span></div>
-        <div class="t-row"><b>目标</b><span>活过 10 波，含 2 个 BOSS</span></div>
+    <section class="tt-rate">
+      <h2 class="tt-lab"><i>02</i>刷怪密度<s>局内暂停还能再调</s></h2>
+      <div class="rate" id="rates"></div>
+      <div class="tt-how">
+        <div><b>移动</b><span>WASD / 方向键 / 触屏滑动</span></div>
+        <div><b>攻击</b><span>全自动，锁最近的敌人</span></div>
+        <div><b>升级</b><span>三选一，武器满级进化超武</span></div>
+        <div><b>目标</b><span>活过 10 波，含 2 个 BOSS</span></div>
       </div>
-      <div class="t-keys">TAB 背包　ESC 暂停　M 静音</div>
-    </aside>
-  </div>
+    </section>
 
-  <div class="t-actions">
-    <button class="btn startbig" id="startbtn">
-      <span class="sbt">开 始 对 战</span>
-      <span class="sbs">十波 · 两个 BOSS · 全自动射击</span>
-    </button>
-    <button class="btn codexbtn" id="codexbtn">图 鉴</button>
+    <footer class="tt-foot">
+      <button class="btn codexbtn" id="codexbtn">图 鉴</button>
+      <button class="btn startbig" id="startbtn">
+        <span class="sbt">开 始 对 战</span>
+        <span class="sbs">十波 · 两个 BOSS · 全自动射击</span>
+      </button>
+    </footer>
+
+    <div class="tt-ticker">
+      <span>WASD 移动</span><span>自动射击</span><span>三选一升级</span>
+      <span>TAB 背包</span><span>ESC 暂停</span><span>M 静音</span>
+    </div>
   </div>
-  <div class="hint">点击任意处开启背景音乐 · MADE WITH WORKBUDDY</div>
 </div>
 
 <!-- ══ 升级三选一 ══ -->
@@ -1497,7 +1529,9 @@ function noise(dur, vol, hp){
 }
 var SFX = {
   shoot: function(){ tone(rnd(680,760), 0.07, 'square', 0.10, 320); },
-  laser: function(){ tone(1400, 0.10, 'sawtooth', 0.10, 420); },
+  /* 激光改红之后音色也跟着沉下来：原来 1400Hz 的尖锐电流声配青色束还行，
+     配红色能量束会显得轻。现在是 900Hz 基频 + 1800Hz 泛音叠在一起。 */
+  laser: function(){ tone(900, 0.12, 'square', 0.085, 240); tone(1800, 0.07, 'sawtooth', 0.045, 420); },
   /* 敌人开火：低频、闷、短。和玩家那声高频「咔」明显不同，
      否则满屏时根本分不清「是我在打还是我在挨打」。 */
   eshoot: function(){ tone(190, 0.15, 'square', 0.085, 96); noise(0.07, 0.06, 260); },
@@ -1633,14 +1667,14 @@ var BGM = (function(){
   var startedAt = -1;   // 起播时刻，用来判断换曲时是否需要「先压下再抬起」
 
   /* ── 三首曲子的骨架 ──
-     循环长度（v0.12 加长）：
-       菜单 16 小节 @82bpm  ≈ 46.8 秒（原 8 小节 23.4 秒）
-       战斗 32 小节 @134bpm ≈ 57.3 秒（原 16 小节 28.7 秒）
-       BOSS 24 小节 @152bpm ≈ 37.9 秒（原 16 小节 25.3 秒）
-     为什么加长：原来战斗曲高潮只有 4 小节（7 秒），玩家反馈
-     「高潮刚刚起来一会会就结束了」，整首循环 28 秒在一局 6-8 分钟里要听十几次。
-     现在高潮变成 8 小节（c + c2），c2 整体升八度，第二波是「再上一层」
-     而不是原地重复；旋律本身一个字没改，只是把它放到更高的音区再唱一遍。 */
+     循环长度（v0.13 再加长）：
+       菜单 16 小节 @82bpm  ≈ 46.8 秒
+       战斗 52 小节 @134bpm ≈ 93.1 秒（v0.12 是 57.3 秒）
+       BOSS 32 小节 @152bpm ≈ 50.5 秒（v0.12 是 37.9 秒）
+     玩家反馈「副歌高潮刚抬起来就转弱」——v0.12 虽然把高潮加到 8 小节，
+     但那是「c 4 + c2 4」，c2 升八度之后紧接着就回落，还是不够长。
+     现在高潮改成 12 小节一段（c 4 → c2 4 → c 4），并且整首出现两次，
+     单次高潮就有 21.5 秒，够把人托住。 */
   var SONG = {
     menu: {
       bpm: 82, bars: 16, kit: 'soft',
@@ -1651,22 +1685,26 @@ var BGM = (function(){
       sec:    ['intro','a','a','a', 'b','b','b','b', 'a','a','a','a', 'b','b','b','outro']
     },
     battle: {
-      bpm: 134, bars: 32, kit: 'full',
+      bpm: 134, bars: 52, kit: 'full',
       chords: [[57,60,64], [53,57,60], [48,52,55], [55,59,62]],
-      /* a 主歌 4 → b 副歌 4 → c 高潮 4 → c2 高潮升八度 4
-         → a 回落 4 → b 再起 4 → c 末次高潮 4 → d 收束 4
-         高潮合计 12 小节（37.5%），不再是「刚起来就结束」。
-         d 段保留底鼓，接回第一小节时脉搏不断。 */
-      sec:    ['a','a','a','a', 'b','b','b','b', 'c','c','c','c', 'c2','c2','c2','c2',
-               'a','a','a','a', 'b','b','b','b', 'c','c','c','c', 'd','d','d','d']
+      /* 8 小节主歌铺底 → 副歌 4 → 高潮 12（c / c2 / c）
+         → 回落 4 → 副歌 4 → 高潮 12 → 收束 4 → 尾奏 4
+         高潮合计 24 小节 = 43 秒，是整首的一半。 */
+      sec:    ['a','a','a','a','a','a','a','a', 'b','b','b','b',
+               'c','c','c','c','c2','c2','c2','c2','c','c','c','c',
+               'a','a','a','a', 'b','b','b','b',
+               'c','c','c','c','c2','c2','c2','c2','c','c','c','c',
+               'd','d','d','d', 'outro','outro','outro','outro']
     },
     boss: {
-      bpm: 152, bars: 24, kit: 'heavy',
+      bpm: 152, bars: 32, kit: 'heavy',
       /* 换到 Dm · Bb · F · C，比战斗更暗，低音走八分音符持续推进。
-         BOSS 战目标 32/45 秒，37.9 秒的循环刚好覆盖一场，不用听第二遍。 */
+         BOSS 战 32/45 秒，50.5 秒的循环不会在战斗中途重头开始。 */
       chords: [[50,53,57], [46,50,53], [41,45,48], [48,52,55]],
-      sec:    ['a','a','a','a', 'b','b','b','b', 'c','c','c','c', 'c2','c2','c2','c2',
-               'c','c','c','c', 'd','d','d','d']
+      sec:    ['a','a','a','a', 'b','b','b','b',
+               'c','c','c','c','c2','c2','c2','c2','c','c','c','c',
+               'c','c','c','c','c','c','c','c',
+               'd','d','d','d']
     }
   };
 
@@ -1885,22 +1923,19 @@ var BGM = (function(){
 
   /* 提前 120 毫秒把未来要响的音排进队列，用系统时间驱动而不是帧时间。
      这样即使掉帧，节奏也不会飘。 */
-  function schedule(){
-    if(!playing || paused || !AC || !g) return;
-    var song = SONG[mode];
-    var stepDur = (60 / song.bpm) / 4;   // 十六分音符时长
-    var guard = 0;
-    while(nextTime < AC.currentTime + 0.12 && guard < 48){
-      guard++;
+  /* 把「某一步该响什么」单独抽出来。
+     游戏内播放和离线导出（renderOffline）共用这一份 ——
+     否则导出的试听和游戏里听到的会是两首不同的曲子。 */
+  function emitStep(song, step, t, stepDur){
       var bar   = Math.floor(step / 16);
       var s     = step % 16;
       var barIn = bar % 4;
       var sec   = SEC[song.sec[bar % song.bars]];
       var ch    = song.chords[barIn];
-      var t     = nextTime;
 
       /* 铺底：每小节一次 */
-      if(sec.pad && s === 0) pad(t, ch, stepDur * 16.4, 0.095);
+      /* 高潮段 pad 让一档：铺底太厚，旋律再响也会被糊掉 */
+      if(sec.pad && s === 0) pad(t, ch, stepDur * 16.4, sec.lead === 2 || sec.lead === 3 ? 0.072 : 0.095);
 
       /* 低音 */
       if(sec.bass === 1 && s % 4 === 0) bassNote(t, ch[0] - 12, stepDur * 4.0, 0.30);
@@ -1927,7 +1962,10 @@ var BGM = (function(){
         /* lead 3 = 高潮第二波（c2）：旋律升八度，音量略压 ——
            高音区本身更抓耳，不压会盖过音效。 */
         var octU = sec.lead === 3 ? 12 : 0;
-        var lvU = sec.lead === 3 ? 0.062 : 0.072;
+        /* 原来 0.072 / 0.062，实测高潮段整体 RMS 和主歌几乎一样（0.121 对 0.122）——
+           旋律被 bass(0.30) 和 pad 压住了，「抬起来」这件事只写在谱面上，耳朵听不到。
+           现在抬到 0.105 / 0.092，让高潮真的比主歌亮一截。 */
+        var lvU = sec.lead === 3 ? 0.092 : 0.105;
         if(song.kit === 'heavy'){
           var rb = RIFF_BOSS[barIn][s];
           if(rb) leadNote(t, rb + octU, stepDur * 0.9, lvU * 0.9, true);
@@ -1955,12 +1993,48 @@ var BGM = (function(){
       }
       if(sec.crash && s === 0 && bar % 4 === 0) crash(t, 0.16);
 
+  }
+
+  /* 提前 120 毫秒把未来要响的音排进队列，用系统时间驱动而不是帧时间。
+     这样即使掉帧，节奏也不会飘。 */
+  function schedule(){
+    if(!playing || paused || !AC || !g) return;
+    var song = SONG[mode];
+    var stepDur = (60 / song.bpm) / 4;   // 十六分音符时长
+    var guard = 0;
+    while(nextTime < AC.currentTime + 0.12 && guard < 48){
+      guard++;
+      emitStep(song, step, nextTime, stepDur);
       nextTime += stepDur;
       step = (step + 1) % (song.bars * 16);
     }
   }
 
   return {
+    /* ── 离线导出（只给试听用，游戏内不走这条路）──
+       OfflineAudioContext 的 currentTime 永远不动，schedule() 的
+       「提前 120ms 排队」在离线环境下推进不了，所以这里改成
+       一次性把整首排完。排程调用的 emitStep 与游戏内是同一份。 */
+    durationOf: function(modeName, loops){
+      var s2 = SONG[modeName];
+      return s2.bars * 4 * (60 / s2.bpm) * (loops || 1);
+    },
+    renderOffline: function(ctx, modeName, loops){
+      var song2 = SONG[modeName];
+      var savedAC = AC, savedG = g, savedNoise = noiseBuf;
+      AC = ctx;
+      g = ctx.createGain();
+      g.gain.value = 0.75;          // 与游戏内 vol(0.21) × 主增益大致等效
+      g.connect(ctx.destination);
+      noiseBuf = null;              // 噪声 buffer 必须属于新 ctx
+      var sd = (60 / song2.bpm) / 4;
+      var total = song2.bars * 16 * (loops || 1);
+      for(var i=0;i<total;i++){
+        emitStep(song2, i % (song2.bars * 16), i * sd, sd);
+      }
+      AC = savedAC; g = savedG; noiseBuf = savedNoise;
+      return ctx.startRendering();
+    },
     init: function(){
       if(!AC || g) return;
       g = AC.createGain();
@@ -2789,7 +2863,16 @@ var bulA = instPool(new THREE.BoxGeometry(0.17, 0.17, 1),
    ⚠️ 但冷色只有一个色相就会出问题：箭（青白）、炸弹、飞镖原本挤在同一个池子里，
    全是青绿，玩家根本分不清自己在放什么 —— 所以每种投掷物单独一个池、单独一个色。 */
 var bulB = instPool(new THREE.OctahedronGeometry(0.24, 0),
-  new THREE.MeshBasicMaterial({color:0xff3b30}), 240);   // 炸弹：红
+  new THREE.MeshBasicMaterial({color:0xff3b30}), 240);   // 炸弹：橙红
+/* 激光单独一个池。
+   原来激光和箭都走 bulA（青白），玩家反馈「激光和箭雨一个色系」——
+   根因不是配色表，是它们真的共用同一份材质。
+
+   颜色取自围墙石头的蓝 0x4fb3e8，压暗降饱和到 #4a7fb8：
+   正红（上一版）明度太高，在一片粉蓝地面里太扎眼；石蓝既在场景色系里，
+   又比青白的箭矢暗两档，同屏一眼能分开。 */
+var bulD = instPool(new THREE.BoxGeometry(0.17, 0.17, 1),
+  new THREE.MeshBasicMaterial({color:0x4a7fb8}), 240);   // 激光：石蓝
 
 /* ── 飞镖 ──
    三条线里它最需要「看得见」：飞行路线是弧线、还会折回来，
@@ -2835,6 +2918,7 @@ var shuPathPool = instPool(new THREE.OctahedronGeometry(0.19, 0),
   new THREE.MeshBasicMaterial({color:0xffd28a, transparent:true, opacity:0.72,
                                depthWrite:false}), 320);
 var bulletsC = [];   // 飞镖单独一条队列
+var bulletsD = [];   // 激光单独一条队列
 /* ── 敌方弹幕：四层结构，专门为「看得见」设计 ──
    ① 黑壳（BackSide，放大 1.5）：任何亮背景上都有墨线轮廓，灰阶也成立
    ② 洋红本体：危险色独占色相，不再和金色经验球、金色爆炸撞车
@@ -2862,7 +2946,7 @@ function spawnBullet(o){
     wob:o.wob||0, phase:Math.random()*TAU, grow:o.grow||0
   };
   if(b.pierce>0) b.hitList = [];
-  var arr = o.pool === 'B' ? bulletsB : (o.pool === 'C' ? bulletsC : bullets);
+  var arr = o.pool === 'B' ? bulletsB : (o.pool === 'C' ? bulletsC : (o.pool === 'D' ? bulletsD : bullets));
   arr.push(b);
   return b;
 }
@@ -2928,7 +3012,7 @@ var WDEF = {
     desc:'起手武器。箭数随等级增加，四级起箭头可穿透敌人。'
   },
   laser:{
-    name:'穿透激光', short:'激光', col:'#ffe600', max:5, arch:'shot',
+    name:'穿透激光', short:'激光', col:'#4a7fb8', max:5, arch:'shot',
     cd:[0.90,0.82,0.74,0.66,0.58], dmg:[14,17,20,24,28],
     cnt:[1,1,2,2,3], coef:1.0, cntEvo:4, coefEvo:1.0, sHit:1.0, sHitEvo:1.0,
     lv:['单束贯通','增强贯通','双束交叉','双束 + 强化','三束 + 灼烧'],
@@ -3002,7 +3086,7 @@ var PKEYS = ['melee', 'throw', 'shot', 'move', 'hp', 'magnet'];
    武器满级 + 指定被动 ≥3 级 → 进化。用来解决「满级之后无事可做」。 */
 var EVO = {
   bow:      {req:'shot',  name:'箭雨',     col:'#00e5ff', ult:'暴雨模式',   gain:'12 发扇形，全穿透', desc:'一次射出十二支箭，铺满整个扇面'},
-  laser:    {req:'shot',  name:'湮灭射线', col:'#ffe600', ult:'过载贯穿',   gain:'4 束激光，持续 1.35 秒', desc:'四束激光同时贯穿，持续灼烧'},
+  laser:    {req:'shot',  name:'湮灭射线', col:'#4a7fb8', ult:'过载贯穿',   gain:'4 束激光，持续 1.35 秒', desc:'四束激光同时贯穿，持续灼烧'},
   scythe:   {req:'melee', name:'血月斩',   col:'#b6ff3c', ult:'血月',       gain:'6 刃，范围 +60%，吸血', desc:'六把镰刀环绕，命中回复生命'},
   bomb:     {req:'throw', name:'陨石雨',   col:'#ff3b30', ult:'空袭',       gain:'6 颗，爆炸半径 +50%', desc:'六颗炸弹覆盖全场'},
   shuriken: {req:'throw', name:'无限回旋', col:'#ff8a1f', ult:'超旋',       gain:'6 枚，绕两圈，双程全伤害', desc:'六枚飞镖同时抛出，围着战场绕两圈'},
@@ -3014,7 +3098,7 @@ var EVO = {
    每个超武一个周期性必杀：蓄满 → 空格 → 一次明显的形态变化。
    时长/伤害按「等效 DPS ≈ 常态 DPS × 2.2 秒 / 周期」推，六个大致齐平。 */
 var ULT = {
-  laser:    {name:'过载贯穿', cd:6.5, dur:0.55, col:'#ffe600', tip:'粗光束'},
+  laser:    {name:'过载贯穿', cd:6.5, dur:0.55, col:'#4a7fb8', tip:'粗光束'},
   bow:      {name:'暴雨模式', cd:7.0, dur:1.80, col:'#00e5ff', tip:'连射'},
   bomb:     {name:'空袭',     cd:7.0, dur:1.00, col:'#ff3b30', tip:'地毯轰炸'},
   shuriken: {name:'超旋',     cd:5.5, dur:1.35, col:'#ff8a1f', tip:'六枚绕两圈'},
@@ -3195,7 +3279,7 @@ function updateUltUI(force){
   ring.style.stroke = u.col;
   $('ulticon').textContent = u.name;
   $('ultkey').textContent = hero.ult.charge >= 1
-    ? (isTouchDevice() ? '点我释放' : '空格 释放')
+    ? (isTouchDevice() ? '点我' : '空格 释放')
     : Math.round(hero.ult.charge*100) + '%';
   box.classList.toggle('ready', hero.ult.charge >= 1);
 }
@@ -3212,6 +3296,18 @@ function damageBeam(x, z, ang, halfW, dmg){
   }
   forEachEnemy(hit);
   if(boss && !boss.dead) hit(boss);
+}
+
+/* 手机点蓄力环释放。
+   原来这里只有空格键，触屏上那个圆环只是画着好看，点它没有任何反应。 */
+function bindUltTap(){
+  var el = $('ultbox');
+  if(!el) return;
+  el.addEventListener('pointerdown', function(e){
+    e.preventDefault();
+    e.stopPropagation();
+    triggerUlt();
+  });
 }
 
 function triggerUlt(){
@@ -3465,7 +3561,7 @@ function fireWeapon(w, st, ang, dist, tgt){
     var llife = evo ? 1.35 : 0.52;
     for(var j=0;j<nb;j++){
       var a2 = ang + (j-(nb-1)/2)*0.13;
-      spawnBullet({pool:'A', x:hero.x, y:1.05, z:hero.z,
+      spawnBullet({pool:'D', x:hero.x, y:1.05, z:hero.z,
         vx:Math.sin(a2)*58, vz:Math.cos(a2)*58, dmg:ldmg, pierce:99, life:llife,
         r:evo?0.44:0.3, kind:'laser', grow:1});
     }
@@ -3530,12 +3626,20 @@ function fireWeapon(w, st, ang, dist, tgt){
     if(evo) hero.hp = Math.min(hero.maxhp, hero.hp + 0.9);
 
   } else if(w.id === 'spike'){
+    /* 布设位置从「身后」改成「目标脚下」。
+       原因：BOSS 贴上来的时候，玩家得一边挨接触伤害一边往脚下放刺，
+       等于拿血换输出 —— 这是地刺最不合理的地方。
+       现在锁最近的敌人（没有目标就落在正前方 4.5 单位），
+       在它周围铺开，玩家不用贴身也能布场。 */
     var nsp = evo ? 5 : [1,2,2,3,4][lv-1];
-    var back = hero.ang + Math.PI;
+    var tgtS = nearestEnemy(hero.x, hero.z, 18);
+    var cxS, czS;
+    if(tgtS){ cxS = tgtS.x; czS = tgtS.z; }
+    else { cxS = hero.x + Math.sin(hero.ang) * 4.5; czS = hero.z + Math.cos(hero.ang) * 4.5; }
     for(var s2=0;s2<nsp;s2++){
-      var aa = back + (s2-(nsp-1)/2)*0.7;
-      var dd = rnd(1.4, 2.6);
-      addSpike(hero.x + Math.sin(aa)*dd, hero.z + Math.cos(aa)*dd, dmg*(evo?0.85:0.55), lv, evo, st.range);
+      var aa = (nsp === 1 ? 0 : (s2/(nsp-1) - 0.5) * 2.0) + hero.ang;
+      var dd = nsp === 1 ? 0 : 1.15;
+      addSpike(cxS + Math.sin(aa)*dd, czS + Math.cos(aa)*dd, dmg*(evo?0.85:0.55), lv, evo, st.range);
     }
     SFX.shoot();
   }
@@ -3792,7 +3896,7 @@ function openLevelUp(refresh){
       ds = '回一口血，下一波继续';
     }
     el.innerHTML =
-      '<div class="ic" style="background:'+col+';color:#0a0a12"><b>'+ic+'</b></div>'+
+      '<div class="ic" style="background:'+col+';color:'+inkOn(col)+'"><b>'+ic+'</b></div>'+
       '<div class="kd">'+kd+'</div>'+
       '<div class="nm">'+nm+'</div>'+
       '<div class="gain">'+gain+'</div>'+
@@ -4435,7 +4539,8 @@ function updateEnemies(dt){
       nx = Math.sin(ang); nz = Math.cos(ang);
       e.ang = Math.atan2(dx, dz);
 
-      var spd = e.spd;
+      var slowK = (e.slowT > 0) ? e.slowMul : 1;
+      var spd = e.spd * slowK;
       if(key === 'spiker'){
         e.cd -= dt;
         if(e.cd <= 0){ e.cd = 2.4; e.dash = 0.5; }
@@ -4443,7 +4548,7 @@ function updateEnemies(dt){
       } else if(key === 'thrower'){
         e.cd -= dt;
         if(d > 13){ /* 靠近 */ }
-        else if(d < 8){ spd = -e.spd*0.85; }
+        else if(d < 8){ spd = -e.spd*0.85*slowK; }
         else { spd = 0; }
 
         /* 抬手 0.45 秒再开火。
@@ -4469,6 +4574,7 @@ function updateEnemies(dt){
 
       e.x += nx * spd * dt;
       e.z += nz * spd * dt;
+      if(e.slowT > 0) e.slowT -= dt;
 
       if(d < e.r + 0.55) hurtHero(e.dmg);
     }
@@ -4485,6 +4591,22 @@ function updateEnemies(dt){
 }
 
 /* ═══════════ BOSS 更新 ═══════════ */
+/* BOSS 的减速用「位移回拉」实现，不在每处移动代码里乘系数。
+   BOSS 的位移分散在冲锋 / 贴近 / 瞬移 / 弹幕漂移等六七处，
+   逐个加系数必漏；这里在整帧结束后按比例把位移缩回来，一处覆盖全部。 */
+function updateBossWithSlow(dt){
+  if(!boss) return;
+  var px = boss.x, pz = boss.z;
+  updateBoss(dt);
+  var b = boss;
+  if(!b || b.dead) return;
+  if(b.slowT > 0){
+    b.x = px + (b.x - px) * b.slowMul;
+    b.z = pz + (b.z - pz) * b.slowMul;
+    b.slowT -= dt;
+  }
+}
+
 function updateBoss(dt){
   if(!boss) return;
   var b = boss;
@@ -4861,6 +4983,16 @@ function updateEBullets(dt){
   }
 }
 
+/* ═══════════ 减速（地刺专用） ═══════════
+   只改「有效速度」，不动 e.spd 本身 ——
+   e.spd 是所有移动计算的源头，直接改它会永久留下痕迹，
+   等减速时间到了也恢复不回来。 */
+function slowEnemy(e, mul, dur){
+  if(!e || e.dead) return;
+  e.slowT = Math.max(e.slowT || 0, dur);
+  e.slowMul = Math.min(e.slowMul || 1, mul);
+}
+
 /* ═══════════ 地刺 / 宝石 / 宝箱 ═══════════ */
 function updateSpikes(dt){
   for(var i=spikes.length-1;i>=0;i--){
@@ -4870,10 +5002,18 @@ function updateSpikes(dt){
     if(s.tick <= 0){
       s.tick = 0.34;
       var R = (1.25 + s.lv*0.12) * (s.evo ? 1.5 : 1) * (s.rng || 1);
+      /* 扎中就减速 35%、持续 2 秒 —— 地刺的定位从「输出」变成「控场」，
+         BOSS 被拖慢之后近身也不会瞬间被贴死。 */
       forEachEnemy(function(e){
-        if(dist2(s.x,s.z,e.x,e.z) < (R+e.r)*(R+e.r)) hurtEnemy(e, s.dmg, false);
+        if(dist2(s.x,s.z,e.x,e.z) < (R+e.r)*(R+e.r)){
+          hurtEnemy(e, s.dmg, false);
+          slowEnemy(e, 0.65, 2.0);
+        }
       });
-      if(boss && !boss.dead && dist2(s.x,s.z,boss.x,boss.z) < (R+boss.r)*(R+boss.r)) hurtEnemy(boss, s.dmg, false);
+      if(boss && !boss.dead && dist2(s.x,s.z,boss.x,boss.z) < (R+boss.r)*(R+boss.r)){
+        hurtEnemy(boss, s.dmg, false);
+        slowEnemy(boss, 0.65, 2.0);
+      }
     }
   }
 }
@@ -4958,6 +5098,19 @@ function renderBullets(){
     if(n >= 300) break;
   }
   bulA.count = n; bulA.instanceMatrix.needsUpdate = true;
+
+  /* 激光：单独一份红色实例池，几何和缩放与箭一样是细长条 */
+  var nD = 0;
+  for(var iD=0;iD<bulletsD.length;iD++){
+    var bD = bulletsD[iD];
+    _dm.position.set(bD.x, bD.y, bD.z);
+    _dm.rotation.set(0, bD.ang, 0);
+    _dm.scale.set(0.78, 0.78, 3.4);
+    _dm.updateMatrix();
+    bulD.setMatrixAt(nD++, _dm.matrix);
+    if(nD >= 240) break;
+  }
+  bulD.count = nD; bulD.instanceMatrix.needsUpdate = true;
 
   var m = 0;
   for(var j=0;j<bulletsB.length;j++){
@@ -5134,10 +5287,11 @@ function update(dt){
   updateUlt(dt);
   updateWeapons(dt);
   updateEnemies(worldDt);
-  updateBoss(worldDt);
+  updateBossWithSlow(worldDt);
   updateBulletArr(bullets, worldDt);
   updateBulletArr(bulletsB, worldDt);
   updateBulletArr(bulletsC, worldDt);
+  updateBulletArr(bulletsD, worldDt);
   updateEBullets(worldDt);
   updateSpikes(worldDt);
   updateSkyArrows(worldDt);
@@ -5202,7 +5356,7 @@ function initHeroLoadout(){
    （宝箱塞武器、刷新权重、描边参数），不再重复第四次。 */
 function clearWorld(){
   EKEYS.forEach(function(k){ E[k].length = 0; });
-  bullets.length = 0; bulletsB.length = 0; bulletsC.length = 0; eBullets.length = 0;
+  bullets.length = 0; bulletsB.length = 0; bulletsC.length = 0; bulletsD.length = 0; eBullets.length = 0;
   gems.length = 0; spikes.length = 0;
   skyArrows.length = 0; ultQueue.length = 0;
   ultPunch = 0;
@@ -5365,6 +5519,16 @@ var RATES = [
   {v:2.30, n:'地狱'}
 ];
 
+/* 底色深浅决定字色：石蓝这类中低明度的底配黑字会糊，
+   用相对亮度算一下，两种墨水挑一种。 */
+function inkOn(hex){
+  var h = String(hex).replace('#','');
+  if(h.length === 3) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+  var r = parseInt(h.substr(0,2),16)/255, g2 = parseInt(h.substr(2,2),16)/255, b = parseInt(h.substr(4,2),16)/255;
+  var L = 0.2126*r + 0.7152*g2 + 0.0722*b;
+  return L > 0.5 ? '#0a0a12' : '#fff6e9';
+}
+
 function renderPickers(){
   var hb = $('heroes');
   hb.innerHTML = '';
@@ -5372,6 +5536,7 @@ function renderPickers(){
     var d = document.createElement('div');
     d.className = 'pick' + (h.id === chosenHero ? ' on' : '');
     var pcol = idx === 0 ? '#00e5ff' : '#ff5b52';
+    d.style.setProperty('--pcol', pcol);   // 卡片左侧那道色条跟着这个走
     d.innerHTML =
       '<div class="pico" style="background:' + pcol + '">' + h.name.charAt(0) + '</div>' +
       '<div class="ptxt"><b>' + h.name + '</b><s>' + h.sub + '</s>' +
@@ -5816,11 +5981,57 @@ $('hud').classList.add('hide');
 
 /* 启动时绑定方向按钮，必须在 POW 导出之前 */
 bindOrientUI();
+bindUltTap();
 checkOrient();
 
+/* ═══════════ BGM 离线导出（试听用，不影响游戏） ═══════════ */
+function bufferToWavBlob(buf){
+  var ch = buf.numberOfChannels, len = buf.length, sr = buf.sampleRate;
+  var bytes = 44 + len * ch * 2;
+  var ab = new ArrayBuffer(bytes), dv = new DataView(ab);
+  function ws(o, str){ for(var i=0;i<str.length;i++) dv.setUint8(o+i, str.charCodeAt(i)); }
+  ws(0,'RIFF'); dv.setUint32(4, bytes-8, true); ws(8,'WAVE');
+  ws(12,'fmt '); dv.setUint32(16,16,true); dv.setUint16(20,1,true);
+  dv.setUint16(22,ch,true); dv.setUint32(24,sr,true);
+  dv.setUint32(28,sr*ch*2,true); dv.setUint16(32,ch*2,true); dv.setUint16(34,16,true);
+  ws(36,'data'); dv.setUint32(40,len*ch*2,true);
+  var chans = [];
+  for(var c=0;c<ch;c++) chans.push(buf.getChannelData(c));
+  var off = 44;
+  for(var i=0;i<len;i++){
+    for(var c2=0;c2<ch;c2++){
+      var v = chans[c2][i];
+      if(v > 1) v = 1; else if(v < -1) v = -1;
+      dv.setInt16(off, v < 0 ? v*0x8000 : v*0x7FFF, true);
+      off += 2;
+    }
+  }
+  return new Blob([ab], {type:'audio/wav'});
+}
+
+/* 渲染整首，把 WAV 以 base64 挂在 window.__wavB64 上，交给外部脚本取走。
+   不直接用 <a download>：无头浏览器会静默拦掉 blob 下载。 */
+window.renderBGMToBase64 = function(mode, loops){
+  loops = loops || 1;
+  var dur = BGM.durationOf(mode, loops);
+  var sr = 44100;
+  var ctx = new OfflineAudioContext(2, Math.ceil(dur * sr), sr);
+  return BGM.renderOffline(ctx, mode, loops).then(function(buf){
+    var ab = bufferToWavBlob(buf).arrayBuffer();
+    return ab.then(function(arr){
+      var u8 = new Uint8Array(arr), str = '', CH = 0x8000;
+      for(var p=0;p<u8.length;p+=CH){
+        str += String.fromCharCode.apply(null, u8.subarray(p, p+CH));
+      }
+      window.__wavB64 = btoa(str);
+      return {dur: +dur.toFixed(1), bytes: u8.length, b64len: window.__wavB64.length};
+    });
+  });
+};
+
 window.POW = {
-  S:S, hero:hero, E:E, gems:gems, bullets:bullets, bulletsB:bulletsB, bulletsC:bulletsC, skyArrows:skyArrows,
-  pools:{shuBody:shuBodyPool, shuOutline:shuOutlinePool, shuCore:shuCorePool, shuPath:shuPathPool, shuTrail:shuTrailPool},
+  S:S, hero:hero, E:E, gems:gems, bullets:bullets, bulletsB:bulletsB, bulletsC:bulletsC, bulletsD:bulletsD, skyArrows:skyArrows,
+  pools:{shuBody:shuBodyPool, shuOutline:shuOutlinePool, shuCore:shuCorePool, shuPath:shuPathPool, shuTrail:shuTrailPool, bulD:bulD, bulA:bulA},
   eBullets:eBullets, chests:chests, spikes:spikes, parts:parts,
   start:startGame, over:gameOver, WDEF:WDEF, PDEF:PDEF,
   gainXP:gainXP, openChest:openChest, buildChest:buildChest, spawnBoss:spawnBoss,
