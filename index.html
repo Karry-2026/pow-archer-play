@@ -436,13 +436,14 @@ body.is-title canvas#gl{
   #rotate .rt{font-size:24px;-webkit-text-stroke:2px var(--ink)}
 }
 
-/* ── 摇杆 ── */
-#stick{position:fixed;left:0;bottom:0;width:46vw;height:58vh;z-index:14;display:none}
-#stick.on{display:block}
-#stick .base{position:absolute;width:110px;height:110px;border-radius:50%;
-  border:5px solid rgba(255,246,233,.55);background:rgba(10,10,18,.25);transform:translate(-50%,-50%)}
-#stick .knob{position:absolute;width:52px;height:52px;border-radius:50%;background:var(--yel);
-  border:5px solid var(--ink);transform:translate(-50%,-50%);box-shadow:3px 3px 0 rgba(10,10,18,.5)}
+/* ── 摇杆：已移除 ──
+   早期是固定在左下角的区域，后来改成「按下点为中心」的浮动摇杆，
+   但容器还留着 position:fixed; bottom:0; height:58vh。
+   里面的圆盘用 left/top = clientX/clientY 定位，坐标系原点是容器的左上角，
+   也就是屏幕底部往上 58vh 的地方 —— 圆盘实际被画到手指下方 42vh，
+   手指在屏幕上半部分按就直接飞出屏幕。
+   移动逻辑本来就不读这两个元素（靠 canvas 的 pointer 事件），
+   全屏滑动已经能正常操作，所以整套视觉直接去掉。 */
 
 /* ── 加载 ── */
 #boot{position:fixed;inset:0;z-index:99;background:var(--ink);display:flex;flex-direction:column;
@@ -890,7 +891,7 @@ body.is-title canvas#gl{
 <div id="fx"></div>
 <div id="flash"></div>
 
-<div id="stick"><div class="base"></div><div class="knob"></div></div>
+<!-- 摇杆已移除：触屏直接全屏滑动，不需要视觉层 -->
 <div id="audiobox">
   <button id="mutebtn" title="点击关闭声音" aria-label="静音开关">
     <svg class="ic-on" viewBox="0 0 24 24" aria-hidden="true">
@@ -971,7 +972,7 @@ body.is-title canvas#gl{
     <aside class="t-col t-howto">
       <div class="t-howhead">玩法速览</div>
       <div class="t-rows">
-        <div class="t-row"><b>移动</b><span>WASD 或方向键，触屏拖左半屏</span></div>
+        <div class="t-row"><b>移动</b><span>WASD 或方向键；触屏按住屏幕任意位置滑动</span></div>
         <div class="t-row"><b>攻击</b><span>全自动，自己锁最近的敌人</span></div>
         <div class="t-row"><b>升级</b><span>三选一，武器满级可进化超武</span></div>
         <div class="t-row"><b>宝箱</b><span>开出随机武器与被动</span></div>
@@ -4050,10 +4051,14 @@ addEventListener('keyup', function(e){
 });
 addEventListener('blur', function(){ keys = {}; });
 
+/* ═══════════ 触屏操作 ═══════════
+   浮动摇杆：以按下点为原点，手指相对它移动多少，角色就走多快。
+   STICK_R 是「推到底」需要的距离（约 1.5cm），推得越远越快，推到就满速。
+   没有任何视觉元素 —— 全屏滑动本来就够直观，画个圆盘反而挡视线。
+   判定走 canvas 的 pointer 事件，不用 touch 事件：
+   pointer 在 PC 上也能用（鼠标拖拽），而且有 setPointerCapture，
+   手指滑到 HUD 上面也不会丢事件。 */
 var stick = {on:false, id:null, ox:0, oy:0, nx:0, nz:0};
-var stickEl = $('stick');
-var baseEl = stickEl.querySelector('.base');
-var knobEl = stickEl.querySelector('.knob');
 var STICK_R = 58;
 
 canvas.addEventListener('pointerdown', function(e){
@@ -4062,11 +4067,7 @@ canvas.addEventListener('pointerdown', function(e){
   if(stick.id !== null) return;
   stick.id = e.pointerId; stick.on = true;
   stick.ox = e.clientX; stick.oy = e.clientY;
-  stickEl.classList.add('on');
-  baseEl.style.left = e.clientX + 'px';
-  baseEl.style.top  = e.clientY + 'px';
-  knobEl.style.left = e.clientX + 'px';
-  knobEl.style.top  = e.clientY + 'px';
+  stick.nx = 0; stick.nz = 0;
   try{ canvas.setPointerCapture(e.pointerId); }catch(err){}
 });
 canvas.addEventListener('pointermove', function(e){
@@ -4074,8 +4075,6 @@ canvas.addEventListener('pointermove', function(e){
   var dx = e.clientX - stick.ox, dy = e.clientY - stick.oy;
   var len = Math.hypot(dx, dy);
   if(len > STICK_R){ dx = dx/len*STICK_R; dy = dy/len*STICK_R; }
-  knobEl.style.left = (stick.ox + dx) + 'px';
-  knobEl.style.top  = (stick.oy + dy) + 'px';
   stick.nx = dx/STICK_R;
   stick.nz = dy/STICK_R;
 });
@@ -4083,7 +4082,6 @@ function endStick(e){
   if(!stick.on) return;
   stick.on = false; stick.id = null;
   stick.nx = 0; stick.nz = 0;
-  stickEl.classList.remove('on');
 }
 canvas.addEventListener('pointerup', endStick);
 canvas.addEventListener('pointercancel', endStick);
