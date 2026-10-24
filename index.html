@@ -1609,29 +1609,41 @@ var BGM = (function(){
   var step = 0, nextTime = 0, timer = null, noiseBuf = null;
   var startedAt = -1;   // 起播时刻，用来判断换曲时是否需要「先压下再抬起」
 
-  /* ── 三首曲子的骨架 ── */
+  /* ── 三首曲子的骨架 ──
+     循环长度（v0.12 加长）：
+       菜单 16 小节 @82bpm  ≈ 46.8 秒（原 8 小节 23.4 秒）
+       战斗 32 小节 @134bpm ≈ 57.3 秒（原 16 小节 28.7 秒）
+       BOSS 24 小节 @152bpm ≈ 37.9 秒（原 16 小节 25.3 秒）
+     为什么加长：原来战斗曲高潮只有 4 小节（7 秒），玩家反馈
+     「高潮刚刚起来一会会就结束了」，整首循环 28 秒在一局 6-8 分钟里要听十几次。
+     现在高潮变成 8 小节（c + c2），c2 整体升八度，第二波是「再上一层」
+     而不是原地重复；旋律本身一个字没改，只是把它放到更高的音区再唱一遍。 */
   var SONG = {
     menu: {
-      bpm: 82, bars: 8, kit: 'soft',
+      bpm: 82, bars: 16, kit: 'soft',
       /* Am9 · Fmaj7 · Cmaj7 · G6，比三和弦更柔，适合当背景 */
       chords: [[57,60,64,67], [53,57,60,64], [48,52,55,59], [55,59,62,66]],
       /* 循环点两侧是 outro + intro 两个过渡小节。
-         原来是 intro×2 + outro 共 3 小节只剩一条 pad 长音，
-         等于每轮循环有 8.8 秒没有节奏，听感上就是「音乐断了又重新开始」。
-         现在前奏压到 1 小节，且两个过渡段都保留低音和踩镲。 */
-      sec:    ['intro','a','a','b','b','a','b','outro']
+         两个过渡段都保留低音和踩镲，接缝处不会「音乐停了」。 */
+      sec:    ['intro','a','a','a', 'b','b','b','b', 'a','a','a','a', 'b','b','b','outro']
     },
     battle: {
-      bpm: 134, bars: 16, kit: 'full',
+      bpm: 134, bars: 32, kit: 'full',
       chords: [[57,60,64], [53,57,60], [48,52,55], [55,59,62]],
-      /* A 主歌 4 小节 → B 副歌 4 小节 → C 高潮 4 小节 → 回落 4 小节 */
-      sec:    ['a','a','a','a', 'b','b','b','b', 'c','c','c','c', 'a','a','b','b']
+      /* a 主歌 4 → b 副歌 4 → c 高潮 4 → c2 高潮升八度 4
+         → a 回落 4 → b 再起 4 → c 末次高潮 4 → d 收束 4
+         高潮合计 12 小节（37.5%），不再是「刚起来就结束」。
+         d 段保留底鼓，接回第一小节时脉搏不断。 */
+      sec:    ['a','a','a','a', 'b','b','b','b', 'c','c','c','c', 'c2','c2','c2','c2',
+               'a','a','a','a', 'b','b','b','b', 'c','c','c','c', 'd','d','d','d']
     },
     boss: {
-      bpm: 152, bars: 16, kit: 'heavy',
-      /* 换到 Dm · Bb · F · C，比战斗更暗，低音走八分音符持续推进 */
+      bpm: 152, bars: 24, kit: 'heavy',
+      /* 换到 Dm · Bb · F · C，比战斗更暗，低音走八分音符持续推进。
+         BOSS 战目标 32/45 秒，37.9 秒的循环刚好覆盖一场，不用听第二遍。 */
       chords: [[50,53,57], [46,50,53], [41,45,48], [48,52,55]],
-      sec:    ['a','a','a','a', 'b','b','b','b', 'c','c','c','c', 'c','c','d','d']
+      sec:    ['a','a','a','a', 'b','b','b','b', 'c','c','c','c', 'c2','c2','c2','c2',
+               'c','c','c','c', 'd','d','d','d']
     }
   };
 
@@ -1658,6 +1670,10 @@ var BGM = (function(){
     a:     {bass:1, arp:8,  lead:0, pad:1, kick:1, snare:0, hat:2, crash:0},
     b:     {bass:1, arp:8,  lead:1, pad:1, kick:1, snare:1, hat:2, crash:0},
     c:     {bass:2, arp:16, lead:2, pad:1, kick:2, snare:2, hat:1, crash:1},
+    /* 高潮第二波：配器与 c 完全一样，只是旋律整体升八度。
+       同一段旋律连着唱两遍会腻，升八度之后是「又上一层」——
+       这也是很多游戏 BGM 拉长高潮的标准做法：不改旋律，改音区。 */
+    c2:    {bass:2, arp:16, lead:3, pad:1, kick:2, snare:2, hat:1, crash:1},
     d:     {bass:1, arp:6,  lead:0, pad:1, kick:1, snare:0, hat:2, crash:0},
     /* 尾奏：低音 + 分解 + 踩镲，去掉底鼓和军鼓，比主歌薄一档 */
     outro: {bass:1, arp:8,  lead:0, pad:1, kick:0, snare:0, hat:2, crash:0}
@@ -1884,13 +1900,17 @@ var BGM = (function(){
       if(sec.lead === 1 && s % 2 === 0){
         var n1 = LEAD_MID[barIn][s / 2];
         if(n1) leadNote(t, n1, stepDur * 1.9, 0.085);
-      } else if(sec.lead === 2){
+      } else if(sec.lead === 2 || sec.lead === 3){
+        /* lead 3 = 高潮第二波（c2）：旋律升八度，音量略压 ——
+           高音区本身更抓耳，不压会盖过音效。 */
+        var octU = sec.lead === 3 ? 12 : 0;
+        var lvU = sec.lead === 3 ? 0.062 : 0.072;
         if(song.kit === 'heavy'){
           var rb = RIFF_BOSS[barIn][s];
-          if(rb) leadNote(t, rb, stepDur * 0.9, 0.072, true);
+          if(rb) leadNote(t, rb + octU, stepDur * 0.9, lvU * 0.9, true);
         } else if(s % 2 === 0){
           var n2 = LEAD_TOP[barIn][s / 2];
-          if(n2) leadNote(t, n2, stepDur * 1.7, 0.075);
+          if(n2) leadNote(t, n2 + octU, stepDur * 1.7, lvU);
         }
       }
 
