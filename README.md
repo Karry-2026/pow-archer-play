@@ -6,6 +6,24 @@
 
 ---
 
+## 当前线上版本
+
+| 项 | 值 |
+|---|---|
+| 版本 | **v0.14.1**（2026-10-26） |
+| 来源 | 主仓库 `pow-archer` 提交 `a2ad0ef` |
+| 文件 | `index.html`，6,071 行 / 267 KB |
+
+怎么确认线上跑的是这一版：打开页面，控制台执行
+
+```js
+document.querySelector('meta[name=app-version]').content
+```
+
+返回 `v0.14.1` 就是最新的。这一版只在页头加了两个 meta（`app-version` / `app-built`），运行逻辑与 v0.14 完全一致。
+
+---
+
 ## 为什么单独开一个仓库
 
 GitHub 免费账号的 Pages 只支持公开仓库。主仓库是私有的，放开发文档、开发日志、git 历史，不适合公开。
@@ -19,6 +37,15 @@ GitHub 免费账号的 Pages 只支持公开仓库。主仓库是私有的，放
 ## 更新方式
 
 改完主仓库的 `index.html` 之后，把它复制过来提交，Pages 会在一分钟左右自动更新。
+
+```bash
+cp ../pow-archer/index.html ./index.html
+git add index.html README.md
+git commit -m "vX.Y: 同步主仓库"
+git push origin main
+```
+
+提交前先跑一次主仓库的回归用例。这个仓库没有测试，也没有构建步骤 —— 它就是最终产物本身。
 
 ---
 
