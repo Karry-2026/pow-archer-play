@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#9ed4f5">
-<meta name="app-version" content="v0.15">
+<meta name="app-version" content="v0.16">
 <meta name="app-built" content="2026-10-27">
 <title>爆裂弓箭手</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230a0a12'/%3E%3Ccircle cx='16' cy='16' r='9' fill='%23ff2e88'/%3E%3Ccircle cx='16' cy='16' r='3.5' fill='%23ffe600'/%3E%3C/svg%3E">
@@ -3587,7 +3587,8 @@ function fireWeapon(w, st, ang, dist, tgt){
          侧向 l = amp·sin(2πu) → 去程偏一侧、回程偏另一侧
        两段弧合起来就是一个「叶子」，去和回是两条不同的线 ——
        玩家能同时看到「扔出去的弧」和「收回来的弧」，而不是原路弹回。
-       伤害按段结算：去程 100%，回程 65%（收回来力量小于扔出去）。 */
+       伤害按段结算：去程 100%，回程 55%（backMul，收回来力量小于扔出去）。
+       合计 1.55 倍单枚伤害 —— estimateDPS 里的 hitMul 就是按这个数定的。 */
     var ns = evo ? 4 : [1,1,2,2,3][lv-1];
     if(ultShu) ns *= 2;
     var spread = ultShu ? 0.44 : 0.20;
@@ -4061,7 +4062,7 @@ function estimateDPS(single){
     var sh = w.evo ? (d.sHitEvo == null ? (d.sHit == null ? 1 : d.sHit) : d.sHitEvo)
                    : (d.sHit == null ? 1 : d.sHit);
     var coef = single ? sh : (w.evo ? d.coefEvo : d.coef);
-    /* 飞镖一趟出去回来打两段（回程按 65% 折算），cnt 只是「几枚」，
+    /* 飞镖一趟出去回来打两段（回程 55%，见 fireWeapon 的 backMul），cnt 只是「几枚」，
        所以这里要乘上单枚的等效段数，否则背包会把它的输出低估掉一半。 */
     var hitMul = d.hitMul || 1;
     total += dmg * cnt / cd * coef * hitMul;
@@ -5716,13 +5717,17 @@ function buildCodexMonster(){
     /* 血量没有固定值：开战那一刻按玩家真实 DPS 派生（见 spawnBoss）。
        这里原来用 EXPECTED_DPS × 16/28 算了个具体数字，目标秒数还是旧值，
        显示的数和实际打起来对不上。改成给出公式本身。 */
-    var ttk = b.wave >= 10 ? 20 : 12;
+    /* 目标墙钟 45 / 32 秒，血量按「单目标 DPS × (墙钟 - 7)」派生。
+       这里原来写的是 20 / 12 —— v0.10 把 BOSS 时长拉到 32/45 之后忘了同步，
+       玩家在游戏里查图鉴看到的数字和实际打起来的时长对不上。 */
+    var ttk = b.wave >= 10 ? 45 : 32;
+    var window_ = ttk - 7;
     var body = '<div class="cx-look">' + b.look + '</div>' +
       '<div class="cx-stats">' +
         '<div class="cx-stat"><span>血量</span><b>实时派生</b></div>' +
         '<div class="cx-stat"><span>目标耗时</span><b>' + ttk + ' 秒</b></div>' +
       '</div>' +
-      '<div class="cx-look" style="font-size:11.5px"><b>血量公式：</b>你的单目标 DPS × ' + ttk + ' 秒</div>' +
+      '<div class="cx-look" style="font-size:11.5px"><b>血量公式：</b>你的单目标 DPS × ' + window_ + ' 秒（墙钟 ' + ttk + ' 秒减去 7 秒无敌）</div>' +
       '<div class="cx-look" style="font-size:11.5px"><b>招式：</b>' + b.moves + '</div>' +
       '<div class="cx-note">' + b.note + '</div>';
     html += codexCard(head, body);
