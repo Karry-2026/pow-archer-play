@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#9ed4f5">
-<meta name="app-version" content="v0.14.1">
-<meta name="app-built" content="2026-10-26">
+<meta name="app-version" content="v0.15">
+<meta name="app-built" content="2026-10-27">
 <title>爆裂弓箭手</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230a0a12'/%3E%3Ccircle cx='16' cy='16' r='9' fill='%23ff2e88'/%3E%3Ccircle cx='16' cy='16' r='3.5' fill='%23ffe600'/%3E%3C/svg%3E">
 <script src="https://unpkg.com/three@0.150.1/build/three.min.js"></script>
@@ -3086,6 +3086,7 @@ var PKEYS = ['melee', 'throw', 'shot', 'move', 'hp', 'magnet'];
 
 /* ═══════════ 超武进化 ═══════════
    武器满级 + 指定被动 ≥3 级 → 进化。用来解决「满级之后无事可做」。 */
+var EVO_W = 1.4;      /* 超武卡在卡池里的权重。武器升级 2.0，新武器 1.0-1.9，通用被动 1.0 */
 var EVO = {
   bow:      {req:'shot',  name:'箭雨',     col:'#00e5ff', ult:'暴雨模式',   gain:'12 发扇形，全穿透', desc:'一次射出十二支箭，铺满整个扇面'},
   laser:    {req:'shot',  name:'湮灭射线', col:'#4a7fb8', ult:'过载贯穿',   gain:'4 束激光，持续 1.35 秒', desc:'四束激光同时贯穿，持续灼烧'},
@@ -3772,15 +3773,30 @@ function buildChoices(){
   var pool = [];
   function add(c, w){ pool.push({c:c, w:w}); }
 
-  // 1. 超武进化：必出（最多占满三张）
+  /* 1. 超武进化：高权重 + 保底，每级最多一张。
+     原来是「必出」—— 达标之后每一级都有一张超武卡抢走一个格子。开局武器是弓，
+     它最先满级，所以「箭雨」几乎每级都刷；三把武器都能进化时三张卡全是超武，
+     想拿别的卡根本没有位置。实测达标后抽样：超武槽 1.00~3.00/次，出现率 100%。
+     那不是概率问题，是必出。
+     现在：进池参与竞争（权重 1.4，武器升级 2.0），每级最多一张，
+     连续三级没刷到则第四级必出。实测：常态单级 28%，算上保底后平均 38%
+     （原来是 100%），平均 2.5 级见到第一次，最长等 4 级。
+     判据在 tests/cardpool.test.mjs —— 改权重或阈值先跑它。 */
   var out = [];
+  var evoCand = [];
   if(!hero.evoId){
     hero.weapons.forEach(function(w){
       var ev = EVO[w.id];
-      if(ev && w.lv >= 5 && !w.evo && (hero.passives[ev.req] || 0) >= 3) out.push({t:'evo', id:w.id});
+      if(ev && w.lv >= 5 && !w.evo && (hero.passives[ev.req] || 0) >= 3) evoCand.push({t:'evo', id:w.id});
     });
   }
-  if(out.length > 3) out.length = 3;
+  var evoForced = false;
+  if(evoCand.length){
+    if((hero.evoDry || 0) >= 4) evoForced = true;   /* 连续三级没刷到 → 第四级必出 */
+    else evoCand.forEach(function(c){ add(c, EVO_W); });
+  } else {
+    hero.evoDry = 0;                                 /* 没达标不累计，从达标那级开始算 */
+  }
 
   // 2. 武器升级
   hero.weapons.forEach(function(w){
@@ -3814,7 +3830,9 @@ function buildChoices(){
     if(w.lv >= WDEF[w.id].max) add({t:'limit', id:w.id}, 0.9);
   });
 
-  // 加权无放回抽，直到 3 张
+  // 加权无放回抽，直到 3 张。超武卡最多一张：同一次升级里抽到第二张直接作废重抽
+  var evoCount = 0;
+  if(evoForced){ out.push(pick(evoCand)); evoCount = 1; }
   while(out.length < 3 && pool.length){
     var total = 0, i;
     for(i=0;i<pool.length;i++) total += pool[i].w;
@@ -3823,11 +3841,23 @@ function buildChoices(){
       r -= pool[i].w;
       if(r <= 0){ k = i; break; }
     }
-    out.push(pool[k].c);
+    var cand = pool[k].c;
     pool.splice(k, 1);
+    if(cand.t === 'evo'){
+      if(evoCount >= 1) continue;
+      evoCount++;
+    }
+    out.push(cand);
   }
+  if(evoCount) hero.evoDry = 0;
 
-  if(hero.hp < hero.maxhp*0.45 && out.length >= 2) out[2] = {t:'heal'};
+  /* 低血补治疗：不能顶掉超武卡 —— 那是攒了半局才有的一次进化机会。
+     原来固定写 out[2]，超武占满三格时会被无声吞掉。 */
+  if(hero.hp < hero.maxhp*0.45 && out.length >= 2){
+    var hi = -1;
+    for(var hh=out.length-1; hh>=0; hh--){ if(out[hh].t !== 'evo'){ hi = hh; break; } }
+    if(hi >= 0) out[hi] = {t:'heal'};
+  }
   while(out.length < 3){
     out.push({t:'limit', id: hero.weapons[0] ? hero.weapons[0].id : 'bow'});
   }
@@ -3838,6 +3868,7 @@ function openLevelUp(refresh){
   if(!refresh && S.mode !== 'play') return;
   S.mode = 'level';
   if(!refresh){
+    hero.evoDry = (hero.evoDry || 0) + 1;   /* 每升一级记一次「没见到超武卡」，重掷不重复计 */
     SFX.level(); flash(0.22);
     /* 升级是玩家看不见摸不着的事（经验球自己飞过来），
        所以在角色脚下补一圈金色扩散，把「升级」这个事件钉在画面上。 */
