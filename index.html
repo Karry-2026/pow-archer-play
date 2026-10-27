@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#9ed4f5">
-<meta name="app-version" content="v0.17">
+<meta name="app-version" content="v0.17.1">
 <meta name="app-built" content="2026-10-27">
 <title>爆裂弓箭手</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230a0a12'/%3E%3Ccircle cx='16' cy='16' r='9' fill='%23ff2e88'/%3E%3Ccircle cx='16' cy='16' r='3.5' fill='%23ffe600'/%3E%3C/svg%3E">
@@ -175,21 +175,11 @@ canvas#gl{position:fixed;inset:0;width:100%;height:100%;display:block}
      所以内容贴顶排（那一段墨面最宽），内边距按最下面那个控件的安全距离取。
      90px 是 844×390 实测的下限，10vw 是 1440×900 的下限，取两者覆盖的包络。 */
   padding-left:clamp(104px,10vw,170px);
-  display:flex; flex-direction:column; justify-content:flex-start;
+  /* 去掉「玩法速览」那段说明之后，右列只剩密度一组控件，贴顶会留下半屏空白。
+     垂直居中让它落在墨面中段；能不能居中要看切线 —— 越往下切线越往右，
+     title.test 会按底边算安全距离，压线就报错。 */
+  display:flex; flex-direction:column; justify-content:center;
 }
-/* 玩法速览：用 margin-bottom:auto 顶到墨面上半区，
-   和贴底的「密度 + 开始」分成两块 —— 上面是读的，下面是点的 */
-.tt-how{
-  margin:clamp(10px,2.4vh,26px) 0 0; display:flex; flex-direction:column;
-  gap:clamp(7px,1.5vh,14px); max-width:min(430px,100%);
-  padding-top:clamp(9px,2vh,18px); border-top:2px dashed rgba(255,246,233,.16);
-}
-.tt-how div{display:flex; gap:12px; align-items:baseline}
-.tt-how b{
-  flex:0 0 42px; font-family:var(--disp); font-size:clamp(10px,1vw,13px);
-  letter-spacing:.16em; color:var(--yel);
-}
-.tt-how span{font-size:clamp(10px,.95vw,12.5px); line-height:1.5; color:#a9a5bf}
 .tt-foot{
   grid-column:2; grid-row:3;
   padding-left:calc(4% + 34px);
@@ -215,12 +205,6 @@ canvas#gl{position:fixed;inset:0;width:100%;height:100%;display:block}
 .tt-logo b{
   display:block; font-size:clamp(34px,6.6vw,96px);
   text-shadow:5px 5px 0 var(--yel), 9px 9px 0 var(--ink);
-}
-.tt-tag{
-  display:inline-block; margin-top:.95em; padding:3px 9px;
-  background:var(--ink); color:var(--yel);
-  font-family:var(--disp); font-size:clamp(9px,1vw,12px); letter-spacing:.26em;
-  transform:skewX(-10deg);
 }
 
 /* ── 步骤标签 ── */
@@ -321,10 +305,6 @@ canvas#gl{position:fixed;inset:0;width:100%;height:100%;display:block}
   animation:pulseCut 2.6s ease-in-out infinite;
 }
 .tt-foot .sbt{font-size:clamp(17px,2vw,27px); letter-spacing:.2em}
-.tt-foot .sbs{
-  font-family:var(--ui); font-weight:700;
-  font-size:clamp(8px,.78vw,10px); letter-spacing:.1em; opacity:.68;
-}
 @keyframes pulseCut{
   0%,100%{box-shadow:7px 7px 0 var(--mag)}
   50%{box-shadow:7px 7px 0 var(--mag),0 0 0 8px rgba(255,230,0,.16)}
@@ -358,7 +338,6 @@ canvas#gl{position:fixed;inset:0;width:100%;height:100%;display:block}
   .tt-grid{padding:8px 14px 8px; gap:5px 0}
   .tt-logo b{font-size:clamp(24px,5.4vw,36px); text-shadow:3px 3px 0 var(--yel),5px 5px 0 var(--ink)}
   .tt-logo s{font-size:9px; letter-spacing:.3em; margin-bottom:.3em}
-  .tt-tag{margin-top:.55em; font-size:9px; padding:2px 7px; letter-spacing:.2em}
   .tt-lab{font-size:12px; margin-bottom:6px; gap:6px}
   .tt-lab i{border-width:2px; padding:0 5px}
   #scr-title .pick{padding:6px 10px 6px 14px; border-width:3px; box-shadow:4px 4px 0 var(--ink); min-height:0}
@@ -366,20 +345,22 @@ canvas#gl{position:fixed;inset:0;width:100%;height:100%;display:block}
   #scr-title .pick:before{width:5px}
   #scr-title .pico{width:34px; height:34px; font-size:17px; border-width:2px}
   #scr-title .pick b{font-size:15px}
-  #scr-title .pick s{font-size:9.5px; margin-top:2px; line-height:1.35}
+  /* 卡片只有 108px 宽，四个字的定位标签会被挤成两行（「远程散 / 射」）。
+     小屏上直接不显示 —— 下面的详情行里已经有同一个词。 */
+  #scr-title .pick s{display:none}
   #scr-title .pickrow{gap:7px}
   #scr-title .pick .tagline{font-size:8px; margin-top:3px; padding:0 4px}
   #scr-title .rate button{padding:6px 3px; font-size:11px; border-width:2px; letter-spacing:.1em}
-  .tt-how{display:none}
   .tt-lab s{display:none}
   /* 手机上墨面只有 260px 高：贴顶会在中间留一大块黑，
      贴底又和「开始」挤成一坨。居中让空档分到上下两头，最均衡。 */
   .tt-rate{justify-content:center}
   .tt-foot .startbig{padding:6px 18px; border-width:3px}
   .tt-foot .sbt{font-size:16px; letter-spacing:.18em}
-  .tt-foot .sbs{display:none}
   .tt-foot .codexbtn{font-size:12px; border-width:3px; padding:0 12px}
-  .tt-ticker{font-size:8px; letter-spacing:.1em; line-height:1.7}
+  /* 键位提示在手机上一条都用不上，而且六条挤成两行压到「开始对战」旁边。
+     小屏直接不显示，操作提示由转屏遮罩和第一局的自动射击本身交代。 */
+  .tt-ticker{display:none}
 }
 
 /* ── 竖屏 / 极窄：斜切改成横向切，纸面在上、墨面在下 ── */
@@ -633,11 +614,9 @@ canvas#gl{position:fixed;inset:0;width:100%;height:100%;display:block}
 #boot .b1{font-family:var(--disp);font-size:clamp(30px,6vw,54px);letter-spacing:.1em;color:var(--yel);
   -webkit-text-stroke:5px #000;paint-order:stroke fill;animation:blink 1s steps(2) infinite}
 @keyframes blink{50%{opacity:.35}}
-#boot .b2{font-family:var(--disp);font-size:12px;letter-spacing:.4em;color:var(--cyn)}
 #boot .bar{width:min(300px,60vw);height:8px;background:#232030;border:3px solid var(--paper);
   overflow:hidden}
 #boot .bar i{display:block;height:100%;width:0%;background:var(--mag);transition:width .28s ease-out}
-#boot .b3{font-family:var(--ui);font-size:11px;letter-spacing:.18em;color:#6b6a7a}
 #bootgo{
   font-family:var(--disp);font-size:clamp(16px,2.2vw,22px);letter-spacing:.22em;
   padding:14px 34px;margin-top:2px;cursor:pointer;
@@ -921,10 +900,6 @@ canvas#gl{position:fixed;inset:0;width:100%;height:100%;display:block}
   font-size: 11px; color: #0a8f55; font-weight: 800;
   border-top: 2px dotted #d8d3c8; padding-top: 7px;
 }
-.codex-foot{
-  flex: 0 0 auto; font-size: 10px; color: #7a7a8a; letter-spacing: .06em;
-  text-align: center;
-}
 
 /* 矮屏（手机横屏）：图鉴压成两列，卡片内容精简 */
 @media (max-height: 520px){
@@ -939,10 +914,8 @@ canvas#gl{position:fixed;inset:0;width:100%;height:100%;display:block}
   .cx-look{ font-size: 10.5px; line-height: 1.4 }
   .cx-stats{ padding-top: 5px; gap: 2px 8px }
   .cx-stat{ font-size: 10px }
-  .codex-foot{ display: none }
   .t-actions{ margin-top: 6px }
   .codexbtn{ min-width: 86px; font-size: 12px }
-  .startbig .sbs{ display: none }
 }
 </style>
 </head>
@@ -1030,7 +1003,6 @@ canvas#gl{position:fixed;inset:0;width:100%;height:100%;display:block}
   <div class="tt-grid">
     <header class="tt-head">
       <h1 class="tt-logo"><s>POW!&nbsp;ARCHER</s><b>爆裂弓箭手</b></h1>
-      <div class="tt-tag">十波死斗 · 两大异兽</div>
     </header>
 
     <section class="tt-hero">
@@ -1040,34 +1012,26 @@ canvas#gl{position:fixed;inset:0;width:100%;height:100%;display:block}
     </section>
 
     <section class="tt-rate">
-      <h2 class="tt-lab"><i>02</i>刷怪密度<s>局内暂停还能再调</s></h2>
+      <h2 class="tt-lab"><i>02</i>刷怪密度</h2>
       <div class="rate" id="rates"></div>
-      <div class="tt-how">
-        <div><b>移动</b><span>WASD / 方向键 / 触屏滑动</span></div>
-        <div><b>攻击</b><span>全自动，锁最近的敌人</span></div>
-        <div><b>升级</b><span>三选一，武器满级进化超武</span></div>
-        <div><b>目标</b><span>活过 10 波，含 2 个 BOSS</span></div>
-      </div>
     </section>
 
     <footer class="tt-foot">
       <button class="btn codexbtn" id="codexbtn">图 鉴</button>
       <button class="btn startbig" id="startbtn">
         <span class="sbt">开 始 对 战</span>
-        <span class="sbs">十波 · 两个 BOSS · 全自动射击</span>
       </button>
     </footer>
 
     <div class="tt-ticker">
-      <span>WASD 移动</span><span>自动射击</span><span>三选一升级</span>
-      <span>TAB 背包</span><span>ESC 暂停</span><span>M 静音</span>
+      <span>WASD 移动</span><span>自动射击</span><span>TAB 背包</span><span>ESC 暂停</span>
     </div>
   </div>
 </div>
 
 <!-- ══ 升级三选一 ══ -->
 <div id="scr-level" class="screen hide">
-  <div class="lvlhead">LEVEL UP!<s>选一个，立刻生效</s></div>
+  <div class="lvlhead">LEVEL UP!</div>
   <div class="cards" id="cards"></div>
   <button id="rerollbtn">重掷</button>
 </div>
@@ -1079,11 +1043,11 @@ canvas#gl{position:fixed;inset:0;width:100%;height:100%;display:block}
     <div class="bagstat" id="bagstat"></div>
     <div class="bagcols">
       <div>
-        <div class="sechead">武器<span>换掉可腾出槽位</span></div>
+        <div class="sechead">武器</div>
         <div class="bgrid" id="bagweapons"></div>
       </div>
       <div>
-        <div class="sechead">被动<span>永久强化</span></div>
+        <div class="sechead">被动</div>
         <div class="bgrid" id="bagpassives"></div>
       </div>
     </div>
@@ -1097,7 +1061,7 @@ canvas#gl{position:fixed;inset:0;width:100%;height:100%;display:block}
 <div id="scr-pause" class="screen hide">
   <div class="panel" style="max-width:min(520px,94vw)">
     <div class="baghead"><h2>暂 停</h2><span>PAUSED</span></div>
-    <div class="sechead">怪物刷新频率<span>随时可调</span></div>
+    <div class="sechead">怪物刷新频率</div>
     <div class="rate" id="rates2"></div>
     <div style="display:flex;justify-content:center;margin-top:20px;gap:10px;flex-wrap:wrap">
       <button class="btn sm" id="resume">继 续</button>
@@ -1112,7 +1076,6 @@ canvas#gl{position:fixed;inset:0;width:100%;height:100%;display:block}
     <div class="codex-head">
       <div class="codex-title">
         <h2>图 鉴</h2>
-        <s>敌人 · 武器 · 被动，全部数值取自游戏内配置</s>
       </div>
       <div class="codex-tabs" id="codexTabs">
         <button data-tab="monster" class="on">敌 人</button>
@@ -1122,7 +1085,6 @@ canvas#gl{position:fixed;inset:0;width:100%;height:100%;display:block}
       <button class="btn sm alt" id="codexclose">关 闭</button>
     </div>
     <div class="codex-body" id="codexBody"></div>
-    <div class="codex-foot">颜色块是该目标在游戏里的实际配色，照着颜色就能认出它</div>
   </div>
 </div>
 
@@ -1145,20 +1107,16 @@ canvas#gl{position:fixed;inset:0;width:100%;height:100%;display:block}
 <div id="rotate">
   <div class="ph"></div>
   <div class="rt">请横屏游玩</div>
-  <div class="rs">把手机转过来就行<br>点下面的按钮也能自动转</div>
   <div class="rbtns">
     <button id="rotbtn" onclick="window.__POW_LOCK&&window.__POW_LOCK()">自动横屏</button>
     <button id="rotskip" onclick="window.__POW_SKIP&&window.__POW_SKIP()">就这样玩</button>
   </div>
-  <div class="rhint">点屏幕任意位置也能关掉·5 秒后自动进入</div>
 </div>
 
 <div id="boot">
   <div class="b1">爆裂弓箭手</div>
-  <div class="b2" id="boottxt">建 议 戴 耳 机 · 点 击 后 立 刻 有 音 乐</div>
   <button id="bootgo">点 击 进 入</button>
   <div class="bar"><i id="bootbar"></i></div>
-  <div class="b3">六个职业 · 十波死斗 · 两大异兽</div>
 </div>
 
 <script>
@@ -4808,7 +4766,11 @@ function updateBoss(dt){
     SFX.boss();
   }
 
-  if(!b.phase3 && b.hp < b.maxhp * 0.30){
+  /* 狂暴阶段必须排在二阶段之后。两段阈值各自独立判断时，一发暴击同时
+     跨过 62% 和 30% 会让两个阶段在同一帧触发：4.5 秒无敌被 2.5 秒覆盖，
+     两条 toast 一起弹，玩家少了一次喘息。实测第 5 波 BOSS 就出现过
+     「P2 与 P3 同一帧、invulnT 只剩 2.5」。所以这里要求二阶段的无敌已经走完。 */
+  if(!b.phase3 && b.phase2 && b.invulnT <= 0 && b.hp < b.maxhp * 0.30){
     b.phase3 = true;
     b.rage = true;
     b.invulnT = 2.5;
@@ -5469,6 +5431,9 @@ var chosenRate = 1.0;
 function initHeroLoadout(){
   hero.speed = 9.2;
   hero.evoId = null;
+  /* 超武保底计数是「这一局连续几级没见到超武卡」，属于局内状态。
+     原来没有重置，上一局攒到 4 会带进下一局，开局第一次升级就保底。 */
+  hero.evoDry = 0;
   hero.ult = {charge: 0, active: 0, pullT: 0, ang: 0, beamTick: undefined,
               rainT: undefined, rainDmg: 0};
   ultQueue.length = 0;
@@ -5516,6 +5481,9 @@ function resetGame(){
   S.t = 0; S.wave = 1; S.waveT = 0; S.kills = 0;
   S.mode = 'play'; S.over = false; S.victory = false; S.hitstop = 0;
   S.spawnMul = chosenRate;
+  /* 每局 3 次重掷。原来只在 S 初始化里写了一次，重开一局不会回到 3 ——
+     第一局用完之后，之后每局开局就是「没有重掷次数了」。 */
+  S.rerolls = 3;
 
   refreshStats();
   hero.hp = hero.maxhp;
@@ -5705,11 +5673,11 @@ function renderPickers(){
   var desc = $('herodesc');
   if(desc){
     var c = heroClass(chosenHero);
-    /* 把「起手武器 → 本职业超武」写在同一行：选职业时就知道这条路最后长什么样 */
+    /* 一行说清三件事：拿什么起手、走哪条路、最后进化成什么。
+       原来的 c.sub（「移速 +13% · 开局疾风之靴」）在背包里看得到，这里不再重复。 */
     var ev = EVO[c.weapon];
     desc.innerHTML = '<b>' + c.name + '</b><i>' + WDEF[c.weapon].name + '起手</i>' +
-                     '<span>' + c.sub + '　·　' + c.tag +
-                     (ev ? '　·　进化：' + ev.name : '') + '</span>';
+                     '<span>' + c.tag + (ev ? '　·　进化：' + ev.name : '') + '</span>';
   }
   [['rates', true], ['rates2', false]].forEach(function(pair){
     var box = $(pair[0]);
@@ -6225,11 +6193,12 @@ requestAnimationFrame(function(t){
    现建 AudioContext、现编着色器、现铺首批敌人，主线程卡住，音乐就晚几秒才响。
    现在把这三件事搬到加载页里做，而且必须在**用户手势**里做 ——
    浏览器的自动播放策略要求点击之后才能出声。 */
-var bootEl = $('boot'), bootTxt = $('boottxt'), bootBar = $('bootbar'), bootGo = $('bootgo');
+var bootEl = $('boot'), bootBar = $('bootbar'), bootGo = $('bootgo');
 var bootDone = false;
 
-function bootStep(txt, pct){
-  if(bootTxt) bootTxt.textContent = txt;
+/* 只推进度条，不写文字。原来每一步都写一行「起播音乐 / 编译着色器 / 铺开战场」——
+   那是给开发者看的，玩家只需要知道「在动」。 */
+function bootStep(pct){
   if(bootBar) bootBar.style.width = pct + '%';
 }
 
@@ -6239,16 +6208,16 @@ function bootRun(){
   bootEl.classList.add('go');
 
   var steps = [
-    ['起 播 音 乐', 24, function(){
+    [24, function(){
       unlockAudio();                 /* 在手势里建 AC */
       BGM.setMode('menu');
       BGM.resume();
     }],
-    ['编 译 着 色 器', 58, function(){
+    [58, function(){
       /* 真编译一遍：这一步做完，进对局时不会再因为新建材质而卡帧 */
       try{ renderer.compile(scene, camera); }catch(e){}
     }],
-    ['铺 开 战 场', 86, function(){
+    [86, function(){
       updateCamera(0.016, 0, 0);
       renderEnemies(); renderBullets(); renderGems();
     }]
@@ -6257,7 +6226,7 @@ function bootRun(){
   var i = 0;
   (function next(){
     if(i >= steps.length){
-      bootStep('就 绪', 100);
+      bootStep(100);
       setTimeout(function(){
         bootEl.classList.add('out');
         setTimeout(function(){ bootEl.style.display = 'none'; }, 460);
@@ -6266,10 +6235,10 @@ function bootRun(){
       return;
     }
     var st = steps[i++];
-    bootStep(st[0], st[1]);
+    bootStep(st[0]);
     /* 40ms 让浏览器把进度条画出来，再干活 —— 否则三步在同一帧里跑完，
        进度条一次都刷不到，看起来像没加载。 */
-    setTimeout(function(){ st[2](); next(); }, 40);
+    setTimeout(function(){ st[1](); next(); }, 40);
   })();
 }
 if(bootGo) bootGo.onclick = bootRun;
