@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#9ed4f5">
-<meta name="app-version" content="v0.17.1">
-<meta name="app-built" content="2026-10-27">
+<meta name="app-version" content="v0.18">
+<meta name="app-built" content="2026-10-28">
 <title>爆裂弓箭手</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230a0a12'/%3E%3Ccircle cx='16' cy='16' r='9' fill='%23ff2e88'/%3E%3Ccircle cx='16' cy='16' r='3.5' fill='%23ffe600'/%3E%3C/svg%3E">
 <script src="https://unpkg.com/three@0.150.1/build/three.min.js"></script>
@@ -232,7 +232,9 @@ canvas#gl{position:fixed;inset:0;width:100%;height:100%;display:block}
 /* ── 职业磁贴：6 个职业排 3×2。
    原来是两张竖排大卡（名字 + 一句长描述 + 标签），塞 6 个会顶出纸面；
    改成磁贴只留「字 + 定位」，长描述挪到网格下面一行固定说明。 ── */
-#scr-title .pickrow{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:clamp(6px,1vh,10px)}
+/* 四个职业排 2×2。三列会把第四张挤到单独一行，左边留一块空白 —— 
+   六职业时代是三列，改成四职业后必须一起改。 */
+#scr-title .pickrow{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:clamp(6px,1vh,10px)}
 #scr-title .pick{
   position:relative; display:grid;
   grid-template-columns:auto minmax(0,1fr);
@@ -2279,16 +2281,16 @@ function buildHero(cid){
   P.push({geo:G_sphere(0.16, 8, 6), color:INK, x:-0.20, y:0.12});
   P.push({geo:G_sphere(0.16, 8, 6), color:INK, x:0.20, y:0.12});
 
-  if(C.id === 'swift'){
-    /* 弓手：头巾 + 双肩甲 + 三段弓（弓身凸向 +Z，弦在后） */
+  if(C.id === 'scatter'){
+    /* 散射：头巾 + 双肩甲 + 三段弓（弓身凸向 +Z，弦在后） */
     P.push({geo:G_cone(0.42, 0.34, 8), color:acc, y:1.58, ry:0.4});
     P.push({geo:G_ico(0.20), color:acc, x:-0.42, y:0.86});
     P.push({geo:G_ico(0.20), color:acc, x:0.42, y:0.86});
     P.push({geo:G_box(0.10, 0.64, 0.14), color:0x4a2c6b, x:0.66, y:1.26, z:0.16, rx:-0.50, rz:-0.34});
     P.push({geo:G_box(0.10, 0.64, 0.14), color:0x4a2c6b, x:0.66, y:0.76, z:0.16, rx:0.50, rz:0.34});
     P.push({geo:G_box(0.03, 0.98, 0.03), color:0xfff6e9, x:0.55, y:1.01, z:0.02});
-  } else if(C.id === 'ward'){
-    /* 镰客：半球盔 + 盔檐 + 方肩 + 背后交叉双镰 */
+  } else if(C.id === 'blade'){
+    /* 连刃：半球盔 + 盔檐 + 方肩 + 背后交叉双刃 */
     P.push({geo:G_sphere(0.42, 14, 10), color:acc, y:1.30, sy:0.74});
     P.push({geo:G_cyl(0.50, 0.46, 0.09, 12), color:acc, y:1.12});
     P.push({geo:G_box(0.28, 0.12, 0.28), color:0x0f2c1e, x:-0.50, y:0.92});
@@ -2297,25 +2299,8 @@ function buildHero(cid){
     P.push({geo:G_box(0.42, 0.09, 0.12), color:0x8fe04a, x:-0.62, y:1.82, z:-0.30, rz:-0.45});
     P.push({geo:G_box(0.08, 1.10, 0.08), color:0x4a2c6b, x:0.46, y:1.30, z:-0.30, rz:-0.34});
     P.push({geo:G_box(0.42, 0.09, 0.12), color:0x8fe04a, x:0.62, y:1.82, z:-0.30, rz:0.45});
-  } else if(C.id === 'ricochet'){
-    /* 镖手：头巾 + 后飘的巾尾 + 圆盘护肩 + 手里一枚十字镖 */
-    P.push({geo:G_cone(0.42, 0.30, 8), color:acc, y:1.56, ry:0.4});
-    P.push({geo:G_box(0.05, 0.26, 0.62), color:acc, x:0, y:1.54, z:-0.44, rx:0.22});
-    P.push({geo:G_cyl(0.22, 0.22, 0.10, 10), color:acc, x:-0.44, y:0.94, rx:1.5708});
-    P.push({geo:G_cyl(0.22, 0.22, 0.10, 10), color:acc, x:0.44, y:0.94, rx:1.5708});
-    P.push({geo:G_box(0.06, 0.36, 0.10), color:0xfff6e9, x:0.72, y:1.02, z:0.26, rz:0.62});
-    P.push({geo:G_box(0.36, 0.06, 0.10), color:0xfff6e9, x:0.72, y:1.02, z:0.26, rz:0.62});
-  } else if(C.id === 'trapper'){
-    /* 刺卫：胸口三根尖刺 + 方块手套 + 背后地刺筒 */
-    P.push({geo:G_cone(0.42, 0.28, 8), color:acc, y:1.56, ry:0.4});
-    P.push({geo:G_cone(0.11, 0.34, 6), color:acc, x:-0.20, y:0.94, z:0.40, rx:1.15});
-    P.push({geo:G_cone(0.11, 0.34, 6), color:acc, x:0, y:0.98, z:0.44, rx:1.15});
-    P.push({geo:G_cone(0.11, 0.34, 6), color:acc, x:0.20, y:0.94, z:0.40, rx:1.15});
-    P.push({geo:G_box(0.24, 0.24, 0.24), color:0x3a1a5e, x:-0.52, y:0.62});
-    P.push({geo:G_box(0.24, 0.24, 0.24), color:0x3a1a5e, x:0.52, y:0.62});
-    P.push({geo:G_cyl(0.15, 0.15, 0.66, 8), color:0x3a1a5e, x:0, y:1.42, z:-0.42});
-  } else if(C.id === 'beamer'){
-    /* 激光师：高帽 + 护目镜条 + 法杖（顶端一颗发光晶体） */
+  } else if(C.id === 'beam'){
+    /* 激光手：高帽 + 护目镜条 + 法杖（顶端一颗发光晶体） */
     P.push({geo:G_cyl(0.26, 0.42, 0.10, 12), color:acc, y:1.50});
     P.push({geo:G_cyl(0.26, 0.30, 0.46, 10), color:acc, y:1.76});
     P.push({geo:G_box(0.54, 0.10, 0.06), color:INK, y:1.33, z:0.35});
@@ -3043,56 +3028,45 @@ function clearChest(c){
 
 /* ═══════════ 武器定义 ═══════════ */
 var WDEF = {
+  /* ── 四把武器，四种功能，不争同一个 DPS 指标 ──
+     coef 是「一次攻击平均命中几只怪」的折算，只进表、不进实际伤害：
+     实际伤害永远是 dmg，命中几只由判定决定。表里的清怪 DPS = dmg × cnt / cd × coef。
+     所以近战看起来「表上很高」而单体很低 —— 那是它把伤害摊在了整圈怪身上。 */
   bow:{
-    name:'爆裂弓', short:'弓', col:'#00e5ff', max:5, arch:'shot',
-    cd:[0.60,0.53,0.47,0.43,0.38], dmg:[9,10,11,13,15],
-    cnt:[1,2,3,3,5], coef:0.8, cntEvo:12, coefEvo:0.9, sHit:0.85, sHitEvo:0.22,
-    lv:['单发快箭','双发连射','三向散射','三向 + 穿透','五向 + 穿透'],
-    desc:'起手武器。箭数随等级增加，四级起箭头可穿透敌人。'
+    name:'爆裂弓', short:'散', col:'#00e5ff', max:5, arch:'ranged',
+    /* 散射：单发弱、覆盖广。sHit 0.30 —— 七支箭扇开，对单只怪只有两三支能中。 */
+    cd:[0.72,0.66,0.60,0.55,0.50], dmg:[6,7,8,10,12],
+    cnt:[3,4,5,6,7], coef:0.8, cntEvo:12, coefEvo:0.9, sHit:0.30, sHitEvo:0.22,
+    lv:['三向散射','四向散射','五向散射','六向散射','七向散射'],
+    desc:'扇形铺开，单发很轻，胜在覆盖。离得越近越密。'
   },
   laser:{
-    name:'穿透激光', short:'激光', col:'#4a7fb8', max:5, arch:'shot',
-    cd:[0.90,0.82,0.74,0.66,0.58], dmg:[14,17,20,24,28],
-    cnt:[1,1,2,2,3], coef:1.0, cntEvo:4, coefEvo:1.0, sHit:1.0, sHitEvo:1.0,
-    lv:['单束贯通','增强贯通','双束交叉','双束 + 强化','三束 + 灼烧'],
-    desc:'指哪打哪的直线激光，无视一切阻挡。等级越高束数越多。'
+    name:'穿透激光', short:'激', col:'#4a7fb8', max:5, arch:'ranged',
+    /* 激光：单发最重、一条线打穿。sHit 1.0 —— 指哪打哪，不靠运气。 */
+    cd:[0.95,0.85,0.76,0.66,0.56], dmg:[22,30,39,49,60],
+    cnt:[1,1,1,1,1], coef:1.4, cntEvo:2, coefEvo:1.1, sHit:1.0, sHitEvo:1.0,
+    lv:['单束贯通','增强贯通','加粗光束','贯穿强化','三倍聚能'],
+    desc:'一条线打到底，单发最重。怪排成串时一发能穿三个。'
   },
-  scythe:{
-    name:'环绕镰', short:'镰刀', col:'#b6ff3c', max:5, arch:'melee',
-    cd:[0.56,0.52,0.48,0.44,0.40], dmg:[14,17,20,23,26],
-    cnt:[1,1,1,1,1], coef:2.6, cntEvo:1, coefEvo:4.2, sHit:0.70, sHitEvo:0.70,
-    lv:['单刃环绕','双刃环绕','双刃提速','三刃环绕','四刃风暴'],
-    desc:'刀刃绕身旋转，不占用射击节奏。贴脸即绞杀，最稳的近身流派。'
+  blade:{
+    name:'连刃', short:'刃', col:'#b6ff3c', max:5, arch:'melee',
+    /* 连刃：刀刃在内外圈之间往复，半个周期结算一次 —— 外扩打远、回收打近，
+       一个呼吸周期两段伤害。hitMul 2 就是给表算这两段的。 */
+    cd:[1.10,1.02,0.94,0.86,0.78], dmg:[10,13,16,20,24],
+    cnt:[1,1,1,1,1], coef:2.4, cntEvo:1, coefEvo:3.6, sHit:0.70, sHitEvo:0.70, hitMul:2,
+    lv:['单刃','双刃','三刃','四刃','六刃'],
+    desc:'刀刃绕身呼吸：向外张开一段、收回一段，两段都伤人。贴脸才有收益。'
   },
   bomb:{
-    name:'抛掷炸弹', short:'炸弹', col:'#ff3b30', max:5, arch:'throw',
-    cd:[1.55,1.40,1.28,1.16,1.02], dmg:[16,19,23,27,32],
-    cnt:[1,2,2,3,4], coef:1.2, cntEvo:6, coefEvo:1.6, sHit:1.0, sHitEvo:1.0,
+    name:'抛掷炸弹', short:'炸', col:'#ff3b30', max:5, arch:'ranged',
+    /* 炸弹：单次最重、频率最慢。sHit 0.6 —— 炸一片，对单体只吃到一部分。 */
+    cd:[1.55,1.42,1.30,1.18,1.06], dmg:[20,24,28,31,34],
+    cnt:[1,2,2,3,4], coef:1.2, cntEvo:6, coefEvo:1.4, sHit:0.60, sHitEvo:0.60,
     lv:['单颗抛掷','双颗抛掷','双颗 + 爆域','三颗 + 爆域','四颗 + 连锁'],
-    desc:'抛出去落地炸开，范围伤害。怪越密收益越高，清屏主力。'
-  },
-  shuriken:{
-    name:'回旋镖', short:'飞镖', col:'#ff8a1f', max:5, arch:'throw',
-    cd:[0.98,0.90,0.80,0.70,0.60], dmg:[11,14,17,19,22],
-    /* coef 0.55 -> 0.78：v0.11 双程改造后它的清怪 DPS 掉到 93.8，
-       比最弱的镰刀低 44%，六把武器极差 1.80 倍。审计脚本抓出来的。 */
-    cnt:[1,1,2,2,3], coef:0.78, cntEvo:3, coefEvo:0.95, sHit:0.90, sHitEvo:0.80,
-    hitMul:1.55,
-    lv:['单枚回旋','单枚强化','双枚回旋','双枚 + 加速','三枚 + 双程穿透'],
-    desc:'扔出去划一道弧再收回来，去程回程各算一次伤害。频率比弓慢，单发比弓重。'
-  },
-  spike:{
-    name:'地刺', short:'地刺', color:'#7b2ff7', col:'#7b2ff7', max:5, arch:'melee',
-    cd:[1.30,1.18,1.06,0.94,0.82], dmg:[10,13,17,21,27],
-    /* 地刺是唯一「铺在地上等怪踩」的武器，单体命中率天然低（0.50）。
-       但 0.50 让它在 BOSS 战里几乎不产生伤害，玩家反馈「强度体现不出来」。
-       伤害 +12%、单体命中 0.50 -> 0.62，清怪 DPS 134.6 -> 151.5。 */
-    cnt:[1,1,1,1,1], coef:4.6, cntEvo:1, coefEvo:7.0, sHit:0.62, sHitEvo:0.62,
-    lv:['一片地刺','两片地刺','两片 + 减速','三片地刺','四片雷区'],
-    desc:'沿走位方向留下尖刺，敌人踩上去持续掉血。边跑边下套。'
+    desc:'抛出去落地炸开，怪越密越值。冷却长，落点要预判。'
   }
 };
-var WKEYS = ['bow','laser','scythe','bomb','shuriken','spike'];
+var WKEYS = ['bow','laser','blade','bomb'];
 
 /* ═══════════ 三条流派 ═══════════
    每把武器只属于一条线。流派精通只加成自己那条线，
@@ -3102,21 +3076,20 @@ var WKEYS = ['bow','laser','scythe','bomb','shuriken','spike'];
    参考 Brotato：四种伤害属性按武器类别分离，混点等于两套都半吊子；
    同职业套装给额外回报。这里把「职业」简化成三条线。 */
 var ARCH = {
-  melee: {name:'贴身', col:'#b6ff3c', sub:'绕身绞杀 · 越贴越强'},
-  throw: {name:'投掷', col:'#2ee6c0', sub:'抛出去再回来 · 算提前量'},
-  shot:  {name:'射击', col:'#00e5ff', sub:'站定输出 · 一条线打穿'}
+  /* 两条线。原来三条（射击 / 贴身 / 投掷），一局 22 次升级要喂三个方向，
+     结果每个都喂不饱 —— 玩家感受到的就是「什么都不强」。 */
+  melee:  {name:'近身', col:'#b6ff3c', sub:'绕身绞杀 · 越贴越强'},
+  ranged: {name:'远程', col:'#00e5ff', sub:'站定输出 · 拉开距离'}
 };
-var ARCH_KEYS = ['melee', 'throw', 'shot'];
+var ARCH_KEYS = ['melee', 'ranged'];
 var SET_BONUS = 1.30;      // 同流派双持
 var ARCH_DMG = 0.20;       // 每级流派精通加的伤害
 
 var PDEF = {
-  melee: {name:'贴身精通', short:'贴身', col:'#b6ff3c', max:5, arch:'melee',
-          txt:function(l){ return '镰刀/地刺 伤害 +'+Math.round(l*100*ARCH_DMG)+'%，范围 +'+Math.round(l*6)+'%'; }},
-  throw: {name:'投掷精通', short:'投掷', col:'#2ee6c0', max:5, arch:'throw',
-          txt:function(l){ return '炸弹/飞镖 伤害 +'+Math.round(l*100*ARCH_DMG)+'%，暴击 +'+Math.round(l*4)+'%'; }},
-  shot:  {name:'射击精通', short:'射击', col:'#00e5ff', max:5, arch:'shot',
-          txt:function(l){ return '弓箭/激光 伤害 +'+Math.round(l*100*ARCH_DMG)+'%，攻速 +'+Math.round(l*5)+'%'; }},
+  melee: {name:'近身精通', short:'近身', col:'#b6ff3c', max:5, arch:'melee',
+          txt:function(l){ return '连刃 伤害 +'+Math.round(l*100*ARCH_DMG)+'%，范围 +'+Math.round(l*6)+'%'; }},
+  ranged:{name:'远程精通', short:'远程', col:'#00e5ff', max:5, arch:'ranged',
+          txt:function(l){ return '弓/激光/炸弹 伤害 +'+Math.round(l*100*ARCH_DMG)+'%，攻速 +'+Math.round(l*5)+'%'; }},
   move:  {name:'疾风之靴', short:'移速', col:'#ffc233', max:5,
           txt:function(l){ return '移动速度 +'+Math.round(l*6)+'%'; }},
   hp:    {name:'铁壁之心', short:'生命', col:'#ff3b30', max:5,
@@ -3124,18 +3097,16 @@ var PDEF = {
   magnet:{name:'磁力场',   short:'拾取', col:'#b07bff', max:5,
           txt:function(l){ return '经验拾取范围 +'+Math.round(l*30)+'%'; }}
 };
-var PKEYS = ['melee', 'throw', 'shot', 'move', 'hp', 'magnet'];
+var PKEYS = ['melee', 'ranged', 'move', 'hp', 'magnet'];
 
 /* ═══════════ 超武进化 ═══════════
    武器满级 + 指定被动 ≥3 级 → 进化。用来解决「满级之后无事可做」。 */
 var EVO_W = 1.4;      /* 超武卡在卡池里的权重。武器升级 2.0，新武器 1.0-1.9，通用被动 1.0 */
 var EVO = {
-  bow:      {req:'shot',  name:'箭雨',     col:'#00e5ff', ult:'暴雨模式',   gain:'12 发扇形，全穿透', desc:'一次射出十二支箭，铺满整个扇面'},
-  laser:    {req:'shot',  name:'湮灭射线', col:'#4a7fb8', ult:'过载贯穿',   gain:'4 束激光，持续 1.35 秒', desc:'四束激光同时贯穿，持续灼烧'},
-  scythe:   {req:'melee', name:'血月斩',   col:'#b6ff3c', ult:'血月',       gain:'6 刃，范围 +60%，吸血', desc:'六把镰刀环绕，命中回复生命'},
-  bomb:     {req:'throw', name:'陨石雨',   col:'#ff3b30', ult:'空袭',       gain:'6 颗，爆炸半径 +50%', desc:'六颗炸弹覆盖全场'},
-  shuriken: {req:'throw', name:'无限回旋', col:'#ff8a1f', ult:'超旋',       gain:'6 枚，绕两圈，双程全伤害', desc:'六枚飞镖同时抛出，围着战场绕两圈'},
-  spike:    {req:'melee', name:'荆棘领域', col:'#7b2ff7', ult:'荆棘爆发',   gain:'5 片，毒池扩大 50%', desc:'脚下铺满尖刺毒池，走过寸草不生'}
+  bow:   {req:'ranged', name:'箭雨',     col:'#00e5ff', ult:'暴雨模式', gain:'12 发扇形，全穿透', desc:'一次射出十二支箭，铺满整个扇面'},
+  laser: {req:'ranged', name:'湮灭射线', col:'#4a7fb8', ult:'过载贯穿', gain:'2 束激光，持续 1.35 秒', desc:'双束激光同时贯穿，持续灼烧'},
+  blade: {req:'melee',  name:'刃轮',     col:'#b6ff3c', ult:'血月',     gain:'6 刃，范围 +45%，吸血', desc:'六把刀刃绕身，命中回复生命'},
+  bomb:  {req:'ranged', name:'陨石雨',   col:'#ff3b30', ult:'空袭',     gain:'6 颗，爆炸半径 +50%', desc:'六颗炸弹覆盖全场'}
 };
 
 /* ═══════════ 超武必杀 ═══════════
@@ -3143,12 +3114,10 @@ var EVO = {
    每个超武一个周期性必杀：蓄满 → 空格 → 一次明显的形态变化。
    时长/伤害按「等效 DPS ≈ 常态 DPS × 2.2 秒 / 周期」推，六个大致齐平。 */
 var ULT = {
-  laser:    {name:'过载贯穿', cd:6.5, dur:0.55, col:'#4a7fb8', tip:'粗光束'},
-  bow:      {name:'暴雨模式', cd:7.0, dur:1.80, col:'#00e5ff', tip:'连射'},
-  bomb:     {name:'空袭',     cd:7.0, dur:1.00, col:'#ff3b30', tip:'地毯轰炸'},
-  shuriken: {name:'超旋',     cd:5.5, dur:1.35, col:'#ff8a1f', tip:'六枚绕两圈'},
-  scythe:   {name:'血月',     cd:6.0, dur:1.10, col:'#b6ff3c', tip:'聚怪斩杀'},
-  spike:    {name:'荆棘爆发', cd:5.0, dur:0.70, col:'#7b2ff7', tip:'环形地刺'}
+  laser: {name:'过载贯穿', cd:6.5, dur:0.55, col:'#4a7fb8', tip:'粗光束'},
+  bow:   {name:'暴雨模式', cd:7.0, dur:1.80, col:'#00e5ff', tip:'连射'},
+  bomb:  {name:'空袭',     cd:7.0, dur:1.00, col:'#ff3b30', tip:'地毯轰炸'},
+  blade: {name:'血月',     cd:6.0, dur:1.10, col:'#b6ff3c', tip:'聚怪斩杀'}
 };
 
 /* 空袭 / 血月的延时结算队列 */
@@ -3404,28 +3373,14 @@ function triggerUlt(){
                    big: true, mark: 0, col: u.col});
     SFX.boss();
 
-  } else if(id === 'shuriken'){
-    /* 超旋：飞镖数量翻倍、绕两圈，往返路径全部带伤害 */
-    shake(0.35);
-    SFX.shoot();
-
-  } else if(id === 'scythe'){
-    /* 血月：先把 8 单位内敌人往自己这边拽 0.35 秒，再一刀 4 倍伤害 + 回血 */
+  } else if(id === 'blade'){
+    /* 血月：先把 6 单位内敌人往自己这边拽 0.35 秒，再一刀 4 倍伤害 + 回血。
+       连刃本身是「贴脸才有收益」，必杀给它一次强制拉近的机会。 */
     ultRingFx.visible = true;
     ultRingFx.material.color.set(u.col);
     hero.ult.pullT = 0.35;
     ultQueue.push({type:'slash', x: hero.x, z: hero.z, t: 0.38, dmg: base*4.0, r: 5.4, col: u.col});
     shake(0.34); SFX.boss();
-
-  } else if(id === 'spike'){
-    /* 荆棘爆发：以玩家为圆心 16 枚，先裂地再弹起 */
-    for(var k=0;k<16;k++){
-      var ang2 = k/16*TAU;
-      ultQueue.push({type:'spike', x: hero.x + Math.cos(ang2)*2.9,
-                     z: hero.z + Math.sin(ang2)*2.9, t: 0.28,
-                     dmg: base*0.9, col: u.col});
-    }
-    speedLines(0.7, 420); shake(0.4); SFX.shoot();
   }
   toast('超武 · ' + u.name, u.col);
   updateUltUI();
@@ -3516,7 +3471,7 @@ function updateUlt(dt){
 hero.weapons = [{id:'bow', lv:1, cd:0, tick:0}];
 hero.passives = {};
 hero.stat = {atk:1, as:1, spd:9.2, pick:4.6, crit:0.06, range:1,
-  arch:{melee:1, throw:1, shot:1}, archN:{melee:0, throw:0, shot:0}};
+  arch:{melee:1, ranged:1}, archN:{melee:0, ranged:0}};
 
 function hasWeapon(id){
   for(var i=0;i<hero.weapons.length;i++) if(hero.weapons[i].id===id) return hero.weapons[i];
@@ -3578,14 +3533,13 @@ function fireWeapon(w, st, ang, dist, tgt){
   var isCrit = Math.random() < st.crit;
   if(isCrit) dmg *= 2.0;
   var sx = Math.sin(ang), cz = Math.cos(ang);
-  if(w.id !== 'scythe'){
+  if(w.id !== 'blade'){
     burst(hero.x + sx*0.78, 1.05, hero.z + cz*0.78, 0xfff6e9, 2, 4.6, 0.5);
   }
 
   /* 超武必杀的形态变化（只在 active 期间生效） */
   var ultOn = hero.ult && hero.ult.active > 0;
   var ultBow = ultOn && hero.evoId === 'bow';
-  var ultShu = ultOn && hero.evoId === 'shuriken';
 
   if(w.id === 'bow'){
     var n = evo ? 12 : [1,2,3,3,5][lv-1];
@@ -3623,80 +3577,66 @@ function fireWeapon(w, st, ang, dist, tgt){
     }
     SFX.shoot();
 
-  } else if(w.id === 'shuriken'){
-    /* 飞镖的飞行不走「直线 + 反向」那套，改成一条参数曲线：
-         前向 s = sin(πu)      → 0 出发、中段最远、最后回到原点
-         侧向 l = amp·sin(2πu) → 去程偏一侧、回程偏另一侧
-       两段弧合起来就是一个「叶子」，去和回是两条不同的线 ——
-       玩家能同时看到「扔出去的弧」和「收回来的弧」，而不是原路弹回。
-       伤害按段结算：去程 100%，回程 55%（backMul，收回来力量小于扔出去）。
-       合计 1.55 倍单枚伤害 —— estimateDPS 里的 hitMul 就是按这个数定的。 */
-    var ns = evo ? 4 : [1,1,2,2,3][lv-1];
-    if(ultShu) ns *= 2;
-    var spread = ultShu ? 0.44 : 0.20;
-    var maxD = 6.4 + lv * 0.55 + (evo ? 1.4 : 0);
-    for(var c2=0;c2<ns;c2++){
-      var a4 = ang + (c2-(ns-1)/2)*spread;
-      var ux = Math.sin(a4), uz = Math.cos(a4);
-      var one = ultShu ? dmg*1.10 : (evo ? dmg*1.75 : dmg);
-      var b0 = spawnBullet({pool:'C', x:hero.x+ux*0.8, y:1.02, z:hero.z+uz*0.8,
-        dmg: one, kind:'shuriken', life: 99, r: 0.62});
-      b0.ox = hero.x + ux*0.8; b0.oz = hero.z + uz*0.8;
-      b0.dirx = ux; b0.dirz = uz;
-      b0.sidex = -uz; b0.sidez = ux;
-      b0.maxD = maxD * (ultShu ? 1.2 : 1);
-      /* 一圈 = 出去 + 回来。超旋跑两圈，所以是两份时长。 */
-      b0.laps = ultShu ? 2 : 1;
-      b0.done = 0;
-      /* 侧摆幅度必须「小」。最早按 30% 的飞行距离算，中段偏出去 2.7 单位，
-         比怪的身位还宽 —— 视觉上是一条漂亮的弧线，实战里全部擦身而过。
-         0.9 大约是「一个身位」：去程和回程能看出是两条线，但都在准星附近。 */
-      b0.amp = 0.9;
-      b0.dur = 0.95;                  // 单圈时长；超旋跑两圈，总时长 1.9 秒
-      b0.u = 0;
-      b0.segs = []; b0.bossSegs = [];
-      b0.backMul = ultShu ? 1.0 : 0.55;
-      b0.spinA = Math.random()*TAU;
-      b0.tx = b0.x; b0.tz = b0.z;
-      b0.markT = 0;
-    }
-    SFX.shoot();
+  }
+}
 
-  } else if(w.id === 'scythe'){
-    var R = (2.0 + lv*0.32) * (evo ? 1.6 : 1) * st.range;
-    var tickDmg = evo ? dmg*1.35 : dmg;
-    forEachEnemy(function(e){
-      if(dist2(hero.x, hero.z, e.x, e.z) < (R+e.r)*(R+e.r)) hurtEnemy(e, tickDmg, isCrit);
-    });
-    if(boss && !boss.dead && dist2(hero.x, hero.z, boss.x, boss.z) < (R+boss.r)*(R+boss.r)){
-      hurtEnemy(boss, tickDmg, isCrit);
-    }
-    if(evo) hero.hp = Math.min(hero.maxhp, hero.hp + 0.9);
+/* ═══════════ 连刃：呼吸式环绕 ═══════════
+   不是「每隔 cd 打一次范围」，而是刀刃在内外圈之间往复：
+   半个周期到一次极端就结算一次 —— 外扩打远处、回收打近处。
+   一个呼吸周期两段伤害，玩家能看见刀在哪，也能感觉到「张开 / 收回」。
 
-  } else if(w.id === 'spike'){
-    /* 布设位置从「身后」改成「目标脚下」。
-       原因：BOSS 贴上来的时候，玩家得一边挨接触伤害一边往脚下放刺，
-       等于拿血换输出 —— 这是地刺最不合理的地方。
-       现在锁最近的敌人（没有目标就落在正前方 4.5 单位），
-       在它周围铺开，玩家不用贴身也能布场。 */
-    var nsp = evo ? 5 : [1,2,2,3,4][lv-1];
-    var tgtS = nearestEnemy(hero.x, hero.z, 18);
-    var cxS, czS;
-    if(tgtS){ cxS = tgtS.x; czS = tgtS.z; }
-    else { cxS = hero.x + Math.sin(hero.ang) * 4.5; czS = hero.z + Math.cos(hero.ang) * 4.5; }
-    for(var s2=0;s2<nsp;s2++){
-      var aa = (nsp === 1 ? 0 : (s2/(nsp-1) - 0.5) * 2.0) + hero.ang;
-      var dd = nsp === 1 ? 0 : 1.15;
-      addSpike(cxS + Math.sin(aa)*dd, czS + Math.cos(aa)*dd, dmg*(evo?0.85:0.55), lv, evo, st.range);
+   为什么不用「每 cd 一次全范围 AoE」：那样刀刃只是个装饰，
+   伤害和画面各走各的；玩家躲不躲、贴不贴脸，输出都一样。 */
+function bladeRange(w, st){
+  var evo = !!w.evo;
+  return {
+    min: 1.15 * st.range,
+    max: (2.35 + w.lv * 0.34) * st.range * (evo ? 1.45 : 1)
+  };
+}
+function bladeHit(w, st){
+  var d = WDEF[w.id], evo = !!w.evo;
+  var rg = bladeRange(w, st);
+  /* 向外那张打外圈，收回那张打内圈 */
+  var reach = w.bdir === 1 ? rg.max : rg.min;
+  var dmg = d.dmg[w.lv-1] * st.arch[d.arch] * (1 + 0.08*(w.plus||0));
+  var isCrit = Math.random() < st.crit;
+  if(isCrit) dmg *= 2.0;
+  var hit = 0;
+  forEachEnemy(function(e){
+    if(dist2(hero.x, hero.z, e.x, e.z) < (reach + e.r) * (reach + e.r)){ hurtEnemy(e, dmg, isCrit); hit++; }
+  });
+  if(boss && !boss.dead && dist2(hero.x, hero.z, boss.x, boss.z) < (reach + boss.r) * (reach + boss.r)){
+    hurtEnemy(boss, dmg, isCrit); hit++;
+  }
+  if(evo) hero.hp = Math.min(hero.maxhp, hero.hp + 0.9);
+  if(hit){ SFX.hit(); burst(hero.x, 0.9, hero.z, 0xb6ff3c, 3, 5.5, 0.45); }
+}
+function updateBlades(dt){
+  var st = hero.stat;
+  for(var i=0;i<hero.weapons.length;i++){
+    var w = hero.weapons[i], d = WDEF[w.id];
+    if(d.arch !== 'melee') continue;
+    if(w.bt === undefined){ w.bt = 0; w.bdir = 1; }
+    var half = d.cd[w.lv-1] / st.as / 2;
+    w.bt += dt;
+    var guard = 0;
+    /* 一帧跨过多个半周期时补结算（切后台回来 / 卡顿时不会丢伤害） */
+    while(w.bt >= half && guard++ < 4){
+      w.bt -= half;
+      bladeHit(w, st);
+      w.bdir = -w.bdir;
     }
-    SFX.shoot();
   }
 }
 
 function updateWeapons(dt){
   var st = hero.stat;
+  updateBlades(dt);
   for(var i=0;i<hero.weapons.length;i++){
     var w = hero.weapons[i];
+    /* 近战不按「冷却开一枪」走，由 updateBlades 按呼吸相位结算 */
+    if(WDEF[w.id].arch === 'melee') continue;
     w.cd -= dt;
     if(w.cd > 0) continue;
     var def = WDEF[w.id];
@@ -3832,7 +3772,7 @@ function buildChoices(){
   if(!hero.evoId){
     hero.weapons.forEach(function(w){
       var ev = EVO[w.id];
-      if(ev && w.lv >= 5 && !w.evo && (hero.passives[ev.req] || 0) >= 3) evoCand.push({t:'evo', id:w.id});
+      if(ev && w.lv >= 5 && !w.evo && (hero.passives[ev.req] || 0) >= 2) evoCand.push({t:'evo', id:w.id});
     });
   }
   var evoForced = false;
@@ -3895,6 +3835,24 @@ function buildChoices(){
     out.push(cand);
   }
   if(evoCount) hero.evoDry = 0;
+
+  /* 保底：三张里至少一张是「已持有武器的升级」。
+     玩家抱怨的「我玩射击它让我选炸弹」不是随机的错 —— 是池子允许
+     三张全是无关卡。补一条：只要还有武器没满级，第一张一定是升级。
+     这条规则不制造强度，只保证「每次升级都有一次兑现已有投入的机会」。 */
+  if(out.length && out[0].t !== 'evo'){
+    var upIdx = -1;
+    for(var ui=0; ui<out.length; ui++){
+      if(out[ui].t === 'wup' || out[ui].t === 'evo'){ upIdx = ui; break; }
+    }
+    if(upIdx < 0){
+      var cand2 = null;
+      for(var wi=0; wi<hero.weapons.length; wi++){
+        if(hero.weapons[wi].lv < WDEF[hero.weapons[wi].id].max){ cand2 = hero.weapons[wi].id; break; }
+      }
+      if(cand2) out[0] = {t:'wup', id:cand2};
+    }
+  }
 
   /* 低血补治疗：不能顶掉超武卡 —— 那是攒了半局才有的一次进化机会。
      原来固定写 out[2]，超武占满三格时会被无声吞掉。 */
@@ -4146,7 +4104,7 @@ function renderBag(){
       if(w.evo){
         evoLine = '<div class="evoline ready">★ 已进化 · ' + ev.name + '</div>';
       } else {
-        var have = hero.passives[ev.req] || 0, need = 3;
+        var have = hero.passives[ev.req] || 0, need = 2;
         var ok = (w.lv >= 5 && have >= need);
         evoLine = hero.evoId
           ? '<div class="evoline">已选择其它超武，这条路不再开放</div>'
@@ -4223,16 +4181,18 @@ function renderBag(){
 }
 
 /* ═══════════ 镰刀视觉 ═══════════ */
-var scytheParts = [];
+var bladeParts = [];
 (function(){
-  var geo = new THREE.TorusGeometry(0.62, 0.085, 5, 14, Math.PI*0.92);
+  /* 刀身用细长盒而不是圆环：俯视角下圆环是「侧着看的一条线」，
+     会被描边整条吞掉，看起来像六根黑钉子。盒子在俯视里始终是刀刃的形状。 */
+  var geo = new THREE.BoxGeometry(0.17, 0.09, 1.02);
   for(var i=0;i<6;i++){
     var m = new THREE.Mesh(geo, toon(COS.lime));
-    withOutline(m, 1.25);
+    withOutline(m, 1.18);
     m.visible = false;
     m.frustumCulled = false;
     scene.add(m);
-    scytheParts.push(m);
+    bladeParts.push(m);
   }
 })();
 
@@ -4581,17 +4541,27 @@ function updateHero(dt){
     : 0.75;
   heroRing.visible = hero.alive;
 
-  // 镰刀
-  var sc = hasWeapon('scythe');
-  var cnt = sc ? (sc.evo ? 6 : [1,2,2,3,4][sc.lv-1]) : 0;
-  var R = (1.5 + (sc?sc.lv*0.3:0)) * (sc && sc.evo ? 1.5 : 1);
+  /* 连刃：半径不是常数，跟着呼吸相位在内外圈之间走。
+     bdir=+1 正在向外张（内→外），bdir=-1 正在收回（外→内）。
+     结算点就落在两端的极值上 —— 视觉上刀刃到哪个圈，伤害就打到哪个圈。 */
+  var sc = hasWeapon('blade');
+  var cnt = sc ? (sc.evo ? 6 : [1,2,3,4,6][sc.lv-1]) : 0;
+  var R = 0;
+  if(sc){
+    var rg = bladeRange(sc, hero.stat);
+    var half = WDEF.blade.cd[sc.lv-1] / hero.stat.as / 2;
+    var prog = Math.min(1, (sc.bt || 0) / (half || 1));
+    R = (sc.bdir === -1) ? (rg.max + (rg.min - rg.max) * prog)
+                         : (rg.min + (rg.max - rg.min) * prog);
+  }
   for(var i=0;i<6;i++){
-    var m = scytheParts[i];
+    var m = bladeParts[i];
     if(i < cnt){
       m.visible = true;
       var a = S.t * (3.2 + (sc?sc.lv*0.35:0)) + i/cnt*TAU;
       m.position.set(hero.x + Math.cos(a)*R, 0.9, hero.z + Math.sin(a)*R);
-      m.rotation.set(0, -a, Math.sin(S.t*5 + i)*0.18);
+      /* 刀身沿切线方向放，看起来像在转，不是六块板子朝外戳 */
+      m.rotation.set(Math.sin(S.t*5 + i)*0.12, -a + Math.PI/2, Math.sin(S.t*5 + i)*0.18);
     } else {
       m.visible = false;
     }
@@ -5613,18 +5583,16 @@ function togglePause(){
    v0.17 之前只有两个角色、而且都从弓（或镰刀）开始，玩家没有选择权 ——
    现在开局先选职业，武器由职业决定，buildHero 按 id 拼不同的模型。 */
 var HEROES = [
-  {id:'swift',    name:'疾风', sub:'移速 +13% · 开局疾风之靴', tag:'远程散射', weapon:'bow',
-   passives:{move:1, shot:1}, speed:10.4, body:0xd81b60, accent:0xffc400, glow:0x00e5ff},
-  {id:'ward',     name:'铁壁', sub:'生命 +18 · 开局铁壁之心',   tag:'近身环绕', weapon:'scythe',
-   passives:{hp:1, melee:1},  speed:9.0,  body:0x1f6f4a, accent:0xb6ff3c, glow:0xb6ff3c},
-  {id:'ricochet', name:'回锋', sub:'移速 +6% · 开局投掷精通',   tag:'投掷往返', weapon:'shuriken',
-   passives:{move:1, throw:1}, speed:10.0, body:0xc2521a, accent:0xff8a1f, glow:0xff8a1f},
-  {id:'trapper',  name:'布阵', sub:'生命 +18 · 开局贴身精通',   tag:'地面布设', weapon:'spike',
-   passives:{hp:1, melee:1},  speed:9.4,  body:0x532a86, accent:0x9b7bea, glow:0x7b2ff7},
-  {id:'beamer',   name:'贯光', sub:'攻速 +5% · 开局射击精通',   tag:'直线贯穿', weapon:'laser',
-   passives:{shot:1, hp:1},   speed:8.8,  body:0x24506e, accent:0x4a7fb8, glow:0x4a7fb8},
-  {id:'bomber',   name:'火药', sub:'暴击 +4% · 开局投掷精通',   tag:'范围清场', weapon:'bomb',
-   passives:{throw:1, move:1}, speed:9.6, body:0xa01c22, accent:0xff3b30, glow:0xff3b30}
+  /* 四个职业 = 四把武器 = 四种功能。不再有「起手都差不多」的中间态：
+     散射吃覆盖、激光吃单点、连刃吃贴身、炸弹吃密度。 */
+  {id:'scatter', name:'散射', sub:'移速 +13% · 开局远程精通', tag:'扇形覆盖', weapon:'bow',
+   passives:{move:1, ranged:1}, speed:10.4, body:0xd81b60, accent:0xffc400, glow:0x00e5ff},
+  {id:'beam',    name:'激光手', sub:'生命 +18 · 开局远程精通', tag:'直线贯穿', weapon:'laser',
+   passives:{ranged:1, hp:1}, speed:9.2, body:0x24506e, accent:0x4a7fb8, glow:0x4a7fb8},
+  {id:'blade',   name:'连刃', sub:'移速 +6% · 开局近身精通',  tag:'绕身呼吸', weapon:'blade',
+   passives:{melee:1, move:1}, speed:9.8, body:0x1f6f4a, accent:0xb6ff3c, glow:0xb6ff3c},
+  {id:'bomber',  name:'炸弹手', sub:'生命 +18 · 开局远程精通', tag:'范围清场', weapon:'bomb',
+   passives:{ranged:1, hp:1}, speed:9.4, body:0xa01c22, accent:0xff3b30, glow:0xff3b30}
 ];
 function heroClass(id){
   for(var i=0;i<HEROES.length;i++) if(HEROES[i].id === id) return HEROES[i];
@@ -5770,12 +5738,10 @@ var CODEX_BOSS = [
 ];
 
 var CODEX_WROLE = {
-  bow:      {role:'远程 · 散射', note:'扇形多发，人越多越强，最稳的起手'},
-  laser:    {role:'远程 · 穿透', note:'一条线打到底，怪物排队时伤害翻倍'},
-  scythe:   {role:'近身 · 环绕', note:'贴脸清场，不用瞄准，但必须敢往怪堆里站'},
-  bomb:     {role:'投掷 · 范围', note:'抛物线落点爆炸，成堆的怪一次清'},
-  shuriken: {role:'回旋 · 双程', note:'划一道弧再收回来，去程回程都打人'},
-  spike:    {role:'地面 · 陷阱', note:'铺在身后，边跑边铺，专门对付追兵'}
+  bow:   {role:'远程 · 散射', note:'扇形铺开，单发轻、覆盖广，离得越近越密'},
+  laser: {role:'远程 · 贯穿', note:'一条线打到底，单发最重，怪排成串时最赚'},
+  blade: {role:'近身 · 呼吸', note:'刀刃外扩再收回，两段伤害，必须贴脸'},
+  bomb:  {role:'远程 · 范围', note:'抛物线落点爆炸，怪越密越值'}
 };
 
 function codexBlob(cols){
@@ -5890,7 +5856,7 @@ function buildCodexPassive(){
         '<span class="cx-tag">超武 · 整局只能选一个</span></div>' +
       '</div>',
       '<div class="cx-look">' + ev.desc + '</div>' +
-      '<div class="cx-evo">前置：' + w.name + ' 满级 + ' + PDEF[ev.req].name + ' 3 级</div>' +
+      '<div class="cx-evo">前置：' + w.name + ' 满级 + ' + PDEF[ev.req].name + ' 2 级</div>' +
       '<div class="cx-note">' + ev.gain + '</div>' +
       '<div class="cx-look" style="font-size:11.5px"><b>必杀：</b>' +
         (ULT[id] ? ULT[id].name + '　蓄满按空格释放' : '') +
@@ -5961,7 +5927,7 @@ function loop(now){
     camera.lookAt(0, 1.6, 0);
     hero.obj.rotation.y = titleT*0.5;
     hero.obj.position.y = Math.sin(titleT*2)*0.05;
-    scytheParts.forEach(function(m){ m.visible = false; });
+    bladeParts.forEach(function(m){ m.visible = false; });
   } else {
     if(S.mode === 'play'){
       S.t += dt;
@@ -6179,6 +6145,7 @@ window.POW = {
   spawnEnemy:spawnEnemy, spawnGem:spawnGem, ETYPES:ETYPES, camera:camera, renderer:renderer, eMesh:eMesh,
   refreshStats:refreshStats, ARCH:ARCH, PKEYS:PKEYS, ULT:ULT,
   getBoss: function(){ return boss; }, triggerUlt: triggerUlt,
+  bladeParts: bladeParts, bladeRange: bladeRange,
   getCamShake: function(){ return camShake; }, toast: toast,
   getAudio: function(){ return {ac: AC, bgm: BGM, master: masterGain}; },
   get boss(){ return boss; }
