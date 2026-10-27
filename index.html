@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#9ed4f5">
-<meta name="app-version" content="v0.16">
+<meta name="app-version" content="v0.17">
 <meta name="app-built" content="2026-10-27">
 <title>爆裂弓箭手</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230a0a12'/%3E%3Ccircle cx='16' cy='16' r='9' fill='%23ff2e88'/%3E%3Ccircle cx='16' cy='16' r='3.5' fill='%23ffe600'/%3E%3C/svg%3E">
@@ -245,46 +245,51 @@ canvas#gl{position:fixed;inset:0;width:100%;height:100%;display:block}
   color:#8c88a4; white-space:nowrap;
 }
 
-/* ── 射手卡：漫画分格，选中整块翻成黄色 ── */
-#scr-title .pickrow{display:grid; grid-template-columns:1fr; gap:clamp(9px,1.6vh,18px)}
+/* ── 职业磁贴：6 个职业排 3×2。
+   原来是两张竖排大卡（名字 + 一句长描述 + 标签），塞 6 个会顶出纸面；
+   改成磁贴只留「字 + 定位」，长描述挪到网格下面一行固定说明。 ── */
+#scr-title .pickrow{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:clamp(6px,1vh,10px)}
 #scr-title .pick{
-  position:relative; display:grid; grid-template-columns:auto minmax(0,1fr) auto;
-  align-items:center; gap:clamp(10px,1.4vw,18px);
-  min-height:clamp(76px,11.5vh,124px);
-  background:#fff; color:var(--ink); border:4px solid var(--ink); border-radius:0;
-  padding:clamp(10px,1.6vh,18px) clamp(12px,1.2vw,18px) clamp(10px,1.6vh,18px) clamp(16px,1.5vw,22px);
-  box-shadow:6px 6px 0 var(--ink); cursor:pointer; overflow:hidden;
+  position:relative; display:grid;
+  grid-template-columns:auto minmax(0,1fr);
+  grid-template-areas:"ico nm" "ico tg";
+  align-items:center; column-gap:clamp(5px,.6vw,8px); row-gap:1px;
+  min-height:clamp(52px,8.4vh,84px);
+  background:#fff; color:var(--ink); border:3px solid var(--ink); border-radius:0;
+  padding:clamp(4px,.8vh,8px) clamp(5px,.7vw,10px) clamp(4px,.8vh,8px) clamp(7px,.8vw,11px);
+  box-shadow:4px 4px 0 var(--ink); cursor:pointer; overflow:hidden;
   transition:transform .12s cubic-bezier(.2,1.4,.4,1), box-shadow .12s, background .12s;
 }
 #scr-title .pick:before{
-  content:""; position:absolute; left:0; top:0; bottom:0; width:6px;
+  content:""; position:absolute; left:0; top:0; bottom:0; width:5px;
   background:var(--pcol,#7b2ff7);
 }
-#scr-title .pick:hover{transform:translate(-2px,-2px); box-shadow:8px 8px 0 var(--ink)}
-#scr-title .pick.on{background:var(--yel); box-shadow:6px 6px 0 var(--mag),0 0 0 3px var(--ink)}
+#scr-title .pick:hover{transform:translate(-2px,-2px); box-shadow:6px 6px 0 var(--ink)}
+#scr-title .pick.on{background:var(--yel); box-shadow:5px 5px 0 var(--mag),0 0 0 3px var(--ink)}
 #scr-title .pico{
-  flex:0 0 auto; display:flex; align-items:center; justify-content:center;
-  width:clamp(40px,4.6vw,66px); height:clamp(40px,4.6vw,66px);
-  border:3px solid var(--ink); color:#0a0a12;
-  font-family:var(--disp); font-size:clamp(20px,2.4vw,34px); line-height:1;
+  grid-area:ico; display:flex; align-items:center; justify-content:center;
+  width:clamp(24px,3vw,36px); height:clamp(24px,3vw,36px);
+  border:2px solid var(--ink); color:#0a0a12;
+  font-family:var(--disp); font-size:clamp(13px,1.6vw,20px); line-height:1;
   transform:skewX(-8deg);
 }
-#scr-title .ptxt{min-width:0}
 #scr-title .pick b{
-  display:block; font-family:var(--disp);
-  font-size:clamp(16px,1.8vw,26px); letter-spacing:.1em; line-height:1.15;
+  grid-area:nm; font-family:var(--disp);
+  font-size:clamp(12px,1.3vw,17px); letter-spacing:.06em; line-height:1.1;
 }
 #scr-title .pick s{
-  display:block; text-decoration:none; margin-top:4px; color:#4a4a58;
-  font-size:clamp(10px,1.05vw,14px); line-height:1.55;
+  grid-area:tg; text-decoration:none; margin:0; color:#4a4a58;
+  font-size:clamp(8px,.8vw,11px); line-height:1.2; letter-spacing:.02em;
 }
-/* 标签原来塞在文字下面，把卡片撑高、右边留空；
-   现在挪到最右一栏，横向铺满，读起来像漫画的角色卡条 */
-#scr-title .pick .tagline{
-  justify-self:end; padding:3px 8px;
-  background:var(--ink); color:var(--yel);
-  font-family:var(--disp); font-size:clamp(8px,.8vw,11px); letter-spacing:.12em;
-  white-space:nowrap;
+#scr-title .herodesc{
+  margin-top:clamp(5px,.9vh,9px); min-height:clamp(20px,3vh,28px);
+  display:flex; align-items:center; flex-wrap:wrap; gap:5px 7px;
+  font-size:clamp(9px,.92vw,12.5px); line-height:1.35; color:#3a3a46;
+}
+#scr-title .herodesc b{font-family:var(--disp); letter-spacing:.08em; font-size:1.06em; color:var(--ink)}
+#scr-title .herodesc i{
+  font-style:normal; padding:1px 6px; background:var(--ink); color:var(--yel);
+  font-family:var(--disp); font-size:.86em; letter-spacing:.1em;
 }
 
 /* ── 密度：墨面上的 2×2 描边按钮 ── */
@@ -631,7 +636,18 @@ canvas#gl{position:fixed;inset:0;width:100%;height:100%;display:block}
 #boot .b2{font-family:var(--disp);font-size:12px;letter-spacing:.4em;color:var(--cyn)}
 #boot .bar{width:min(300px,60vw);height:8px;background:#232030;border:3px solid var(--paper);
   overflow:hidden}
-#boot .bar i{display:block;height:100%;width:30%;background:var(--mag);animation:load 1.1s ease-in-out infinite}
+#boot .bar i{display:block;height:100%;width:0%;background:var(--mag);transition:width .28s ease-out}
+#boot .b3{font-family:var(--ui);font-size:11px;letter-spacing:.18em;color:#6b6a7a}
+#bootgo{
+  font-family:var(--disp);font-size:clamp(16px,2.2vw,22px);letter-spacing:.22em;
+  padding:14px 34px;margin-top:2px;cursor:pointer;
+  background:var(--yel);color:var(--ink);border:4px solid var(--paper);
+  box-shadow:6px 6px 0 var(--mag);transform:skewX(-6deg);
+  transition:transform .1s, box-shadow .1s;
+}
+#bootgo:hover{transform:skewX(-6deg) translate(-2px,-2px);box-shadow:8px 8px 0 var(--mag)}
+#bootgo:active{transform:skewX(-6deg) translate(2px,2px);box-shadow:3px 3px 0 var(--mag)}
+#boot.go #bootgo{display:none}
 @keyframes load{0%{margin-left:-30%}100%{margin-left:100%}}
 .hint{font-family:var(--disp);font-size:11px;letter-spacing:.2em;color:#8a8a9a;text-align:center}
 /* ── 竖屏提示 ── */
@@ -1018,8 +1034,9 @@ canvas#gl{position:fixed;inset:0;width:100%;height:100%;display:block}
     </header>
 
     <section class="tt-hero">
-      <h2 class="tt-lab"><i>01</i>选择射手</h2>
+      <h2 class="tt-lab"><i>01</i>选择职业</h2>
       <div class="pickrow" id="heroes"></div>
+      <div class="herodesc" id="herodesc"></div>
     </section>
 
     <section class="tt-rate">
@@ -1137,9 +1154,11 @@ canvas#gl{position:fixed;inset:0;width:100%;height:100%;display:block}
 </div>
 
 <div id="boot">
-  <div class="b1">LOADING</div>
-  <div class="bar"><i></i></div>
-  <div class="b2">正在装填墨水</div>
+  <div class="b1">爆裂弓箭手</div>
+  <div class="b2" id="boottxt">建 议 戴 耳 机 · 点 击 后 立 刻 有 音 乐</div>
+  <button id="bootgo">点 击 进 入</button>
+  <div class="bar"><i id="bootbar"></i></div>
+  <div class="b3">六个职业 · 十波死斗 · 两大异兽</div>
 </div>
 
 <script>
@@ -2279,41 +2298,101 @@ var hero = {
   lv:1, xp:0, xpNext:9, alive:true, hurtFlash:0
 };
 
-function buildHero(){
-  /* 以前是「每个零件一个 mesh、各自带描边」，零件互相穿插时描边会露出黑边，
-     看上去就是身上有斑点。现在合并成一份几何，只在外轮廓描边。
-     弓也改成三段拼装，方向完全可控（之前用半环 Torus 旋转，朝向是错的）。 */
+/* ═══════════ 角色建模（六职业） ═══════════
+   六个职业共用同一套美术语言（圆头 + 两个黑点眼 + 黑脚 + 卡通描边），
+   区别全在躯干轮廓、头饰和随身武器上 —— 剪影一眼能分出谁是谁。
+   零件仍然合并成一份几何，只在外轮廓描边（描边用缩放的旧写法会把小部件包黑）。 */
+function buildHero(cid){
+  var C = heroClass(cid);
   var P = [];
-  // 身体
-  P.push({geo:G_cyl(0.34, 0.52, 0.86, 10), color:0xd81b60, y:0.55});
-  // 头
+  var body = C.body, acc = C.accent;
+
+  /* 躯干：火药用圆桶身材，其余收腰圆柱 */
+  if(C.id === 'bomber'){
+    P.push({geo:G_sphere(0.60, 14, 12), color:body, y:0.76, sy:1.02});
+    P.push({geo:G_cyl(0.30, 0.38, 0.20, 10), color:acc, y:1.16});
+  } else {
+    P.push({geo:G_cyl(0.34, 0.52, 0.86, 10), color:body, y:0.55});
+  }
+  /* 头 / 眼 / 脚：六个职业共用 */
   P.push({geo:G_sphere(0.40, 14, 12), color:0xfff0d0, y:1.26});
-  // 眼睛
   P.push({geo:G_sphere(0.075, 8, 8), color:INK, x:-0.14, y:1.32, z:0.36});
   P.push({geo:G_sphere(0.075, 8, 8), color:INK, x:0.14, y:1.32, z:0.36});
-  // 头巾
-  P.push({geo:G_cone(0.42, 0.34, 8), color:0xffc400, y:1.58, ry:0.4});
-  // 肩甲
-  P.push({geo:G_ico(0.20), color:0x7b2ff7, x:-0.42, y:0.86});
-  P.push({geo:G_ico(0.20), color:0x7b2ff7, x:0.42, y:0.86});
-  // 脚
   P.push({geo:G_sphere(0.16, 8, 6), color:INK, x:-0.20, y:0.12});
   P.push({geo:G_sphere(0.16, 8, 6), color:INK, x:0.20, y:0.12});
-  // 弓：竖直握在右手侧，弓身凸向前方 +Z，弦在后面
-  P.push({geo:G_box(0.10, 0.64, 0.14), color:0x4a2c6b, x:0.66, y:1.26, z:0.16, rx:-0.50, rz:-0.34});
-  P.push({geo:G_box(0.10, 0.64, 0.14), color:0x4a2c6b, x:0.66, y:0.76, z:0.16, rx:0.50, rz:0.34});
-  P.push({geo:G_box(0.03, 0.98, 0.03), color:0xfff6e9, x:0.55, y:1.01, z:0.02});
+
+  if(C.id === 'swift'){
+    /* 弓手：头巾 + 双肩甲 + 三段弓（弓身凸向 +Z，弦在后） */
+    P.push({geo:G_cone(0.42, 0.34, 8), color:acc, y:1.58, ry:0.4});
+    P.push({geo:G_ico(0.20), color:acc, x:-0.42, y:0.86});
+    P.push({geo:G_ico(0.20), color:acc, x:0.42, y:0.86});
+    P.push({geo:G_box(0.10, 0.64, 0.14), color:0x4a2c6b, x:0.66, y:1.26, z:0.16, rx:-0.50, rz:-0.34});
+    P.push({geo:G_box(0.10, 0.64, 0.14), color:0x4a2c6b, x:0.66, y:0.76, z:0.16, rx:0.50, rz:0.34});
+    P.push({geo:G_box(0.03, 0.98, 0.03), color:0xfff6e9, x:0.55, y:1.01, z:0.02});
+  } else if(C.id === 'ward'){
+    /* 镰客：半球盔 + 盔檐 + 方肩 + 背后交叉双镰 */
+    P.push({geo:G_sphere(0.42, 14, 10), color:acc, y:1.30, sy:0.74});
+    P.push({geo:G_cyl(0.50, 0.46, 0.09, 12), color:acc, y:1.12});
+    P.push({geo:G_box(0.28, 0.12, 0.28), color:0x0f2c1e, x:-0.50, y:0.92});
+    P.push({geo:G_box(0.28, 0.12, 0.28), color:0x0f2c1e, x:0.50, y:0.92});
+    P.push({geo:G_box(0.08, 1.10, 0.08), color:0x4a2c6b, x:-0.46, y:1.30, z:-0.30, rz:0.34});
+    P.push({geo:G_box(0.42, 0.09, 0.12), color:0x8fe04a, x:-0.62, y:1.82, z:-0.30, rz:-0.45});
+    P.push({geo:G_box(0.08, 1.10, 0.08), color:0x4a2c6b, x:0.46, y:1.30, z:-0.30, rz:-0.34});
+    P.push({geo:G_box(0.42, 0.09, 0.12), color:0x8fe04a, x:0.62, y:1.82, z:-0.30, rz:0.45});
+  } else if(C.id === 'ricochet'){
+    /* 镖手：头巾 + 后飘的巾尾 + 圆盘护肩 + 手里一枚十字镖 */
+    P.push({geo:G_cone(0.42, 0.30, 8), color:acc, y:1.56, ry:0.4});
+    P.push({geo:G_box(0.05, 0.26, 0.62), color:acc, x:0, y:1.54, z:-0.44, rx:0.22});
+    P.push({geo:G_cyl(0.22, 0.22, 0.10, 10), color:acc, x:-0.44, y:0.94, rx:1.5708});
+    P.push({geo:G_cyl(0.22, 0.22, 0.10, 10), color:acc, x:0.44, y:0.94, rx:1.5708});
+    P.push({geo:G_box(0.06, 0.36, 0.10), color:0xfff6e9, x:0.72, y:1.02, z:0.26, rz:0.62});
+    P.push({geo:G_box(0.36, 0.06, 0.10), color:0xfff6e9, x:0.72, y:1.02, z:0.26, rz:0.62});
+  } else if(C.id === 'trapper'){
+    /* 刺卫：胸口三根尖刺 + 方块手套 + 背后地刺筒 */
+    P.push({geo:G_cone(0.42, 0.28, 8), color:acc, y:1.56, ry:0.4});
+    P.push({geo:G_cone(0.11, 0.34, 6), color:acc, x:-0.20, y:0.94, z:0.40, rx:1.15});
+    P.push({geo:G_cone(0.11, 0.34, 6), color:acc, x:0, y:0.98, z:0.44, rx:1.15});
+    P.push({geo:G_cone(0.11, 0.34, 6), color:acc, x:0.20, y:0.94, z:0.40, rx:1.15});
+    P.push({geo:G_box(0.24, 0.24, 0.24), color:0x3a1a5e, x:-0.52, y:0.62});
+    P.push({geo:G_box(0.24, 0.24, 0.24), color:0x3a1a5e, x:0.52, y:0.62});
+    P.push({geo:G_cyl(0.15, 0.15, 0.66, 8), color:0x3a1a5e, x:0, y:1.42, z:-0.42});
+  } else if(C.id === 'beamer'){
+    /* 激光师：高帽 + 护目镜条 + 法杖（顶端一颗发光晶体） */
+    P.push({geo:G_cyl(0.26, 0.42, 0.10, 12), color:acc, y:1.50});
+    P.push({geo:G_cyl(0.26, 0.30, 0.46, 10), color:acc, y:1.76});
+    P.push({geo:G_box(0.54, 0.10, 0.06), color:INK, y:1.33, z:0.35});
+    P.push({geo:G_cyl(0.05, 0.05, 1.50, 8), color:0x2f3b4a, x:0.62, y:0.90, z:0.10});
+    P.push({geo:G_octa(0.17), color:C.glow, x:0.62, y:1.74, z:0.10});
+  } else if(C.id === 'bomber'){
+    /* 火药：护目镜（两片发光镜片）+ 背包 + 引线 */
+    P.push({geo:G_box(0.46, 0.11, 0.07), color:0x3a2a18, y:1.32, z:0.35});
+    P.push({geo:G_sphere(0.10, 8, 8), color:C.glow, x:-0.15, y:1.32, z:0.42});
+    P.push({geo:G_sphere(0.10, 8, 8), color:C.glow, x:0.15, y:1.32, z:0.42});
+    P.push({geo:G_box(0.54, 0.50, 0.32), color:0x6d3a12, y:0.78, z:-0.44});
+    P.push({geo:G_cyl(0.03, 0.03, 0.26, 6), color:INK, x:0.18, y:1.34, z:-0.40});
+    P.push({geo:G_sphere(0.07, 6, 6), color:0xffc400, x:0.18, y:1.48, z:-0.40});
+  }
 
   var geo = mergeParts(P);
-  var body = new THREE.Mesh(geo, toonVC());
+  var mesh = new THREE.Mesh(geo, toonVC());
   var out = new THREE.Mesh(outlineGeo(geo, 0.032), OUTLINE_MAT);
-  body.add(out);
-  body.scale.setScalar(1.14);
+  mesh.add(out);
+  mesh.scale.setScalar(1.14);
 
   var g = new THREE.Group();
-  g.add(body);
+  g.add(mesh);
   scene.add(g);
   return g;
+}
+/* 换职业要换模型：旧几何显式 dispose，否则选六次就漏六份顶点缓冲。 */
+function rebuildHeroModel(cid){
+  if(hero.obj){
+    scene.remove(hero.obj);
+    hero.obj.traverse(function(o){ if(o.geometry) o.geometry.dispose(); });
+  }
+  hero.obj = buildHero(cid);
+  hero.obj.position.set(hero.x || 0, 0, hero.z || 0);
+  hero.obj.visible = true;
 }
 
 /* ═══════════ 难度曲线 ═══════════
@@ -3037,15 +3116,20 @@ var WDEF = {
   shuriken:{
     name:'回旋镖', short:'飞镖', col:'#ff8a1f', max:5, arch:'throw',
     cd:[0.98,0.90,0.80,0.70,0.60], dmg:[11,14,17,19,22],
-    cnt:[1,1,2,2,3], coef:0.55, cntEvo:3, coefEvo:0.95, sHit:0.90, sHitEvo:0.80,
+    /* coef 0.55 -> 0.78：v0.11 双程改造后它的清怪 DPS 掉到 93.8，
+       比最弱的镰刀低 44%，六把武器极差 1.80 倍。审计脚本抓出来的。 */
+    cnt:[1,1,2,2,3], coef:0.78, cntEvo:3, coefEvo:0.95, sHit:0.90, sHitEvo:0.80,
     hitMul:1.55,
     lv:['单枚回旋','单枚强化','双枚回旋','双枚 + 加速','三枚 + 双程穿透'],
     desc:'扔出去划一道弧再收回来，去程回程各算一次伤害。频率比弓慢，单发比弓重。'
   },
   spike:{
     name:'地刺', short:'地刺', color:'#7b2ff7', col:'#7b2ff7', max:5, arch:'melee',
-    cd:[1.30,1.18,1.06,0.94,0.82], dmg:[9,12,15,19,24],
-    cnt:[1,1,1,1,1], coef:4.6, cntEvo:1, coefEvo:7.0, sHit:0.50, sHitEvo:0.50,
+    cd:[1.30,1.18,1.06,0.94,0.82], dmg:[10,13,17,21,27],
+    /* 地刺是唯一「铺在地上等怪踩」的武器，单体命中率天然低（0.50）。
+       但 0.50 让它在 BOSS 战里几乎不产生伤害，玩家反馈「强度体现不出来」。
+       伤害 +12%、单体命中 0.50 -> 0.62，清怪 DPS 134.6 -> 151.5。 */
+    cnt:[1,1,1,1,1], coef:4.6, cntEvo:1, coefEvo:7.0, sHit:0.62, sHitEvo:0.62,
     lv:['一片地刺','两片地刺','两片 + 减速','三片地刺','四片雷区'],
     desc:'沿走位方向留下尖刺，敌人踩上去持续掉血。边跑边下套。'
   }
@@ -3603,13 +3687,15 @@ function fireWeapon(w, st, ang, dist, tgt){
       b0.dirx = ux; b0.dirz = uz;
       b0.sidex = -uz; b0.sidez = ux;
       b0.maxD = maxD * (ultShu ? 1.2 : 1);
+      /* 一圈 = 出去 + 回来。超旋跑两圈，所以是两份时长。 */
+      b0.laps = ultShu ? 2 : 1;
+      b0.done = 0;
       /* 侧摆幅度必须「小」。最早按 30% 的飞行距离算，中段偏出去 2.7 单位，
          比怪的身位还宽 —— 视觉上是一条漂亮的弧线，实战里全部擦身而过。
          0.9 大约是「一个身位」：去程和回程能看出是两条线，但都在准星附近。 */
       b0.amp = 0.9;
-      b0.dur = ultShu ? 1.35 : 0.95;
+      b0.dur = 0.95;                  // 单圈时长；超旋跑两圈，总时长 1.9 秒
       b0.u = 0;
-      b0.segsN = ultShu ? 4 : 2;      // 超旋绕两圈，四个半程各算一段
       b0.segs = []; b0.bossSegs = [];
       b0.backMul = ultShu ? 1.0 : 0.55;
       b0.spinA = Math.random()*TAU;
@@ -3674,7 +3760,7 @@ var spikePool = instPool(spikeGeo, toon(COS.pur), 90);
 var spikes = [];
 function addSpike(x, z, dmg, lv, evo, rng){
   if(spikes.length > 85) return;
-  spikes.push({x:x, z:z, dmg:dmg, life:evo?3.6:2.6, max:evo?3.6:2.6,
+  spikes.push({x:x, z:z, dmg:dmg, life:evo?4.2:3.2, max:evo?4.2:3.2,
                tick:0, lv:lv, evo:!!evo, born:0, rng:rng||1});
 }
 
@@ -4890,38 +4976,55 @@ function updateBulletArr(arr, dt){
     b.life -= dt;
 
     if(b.kind === 'shuriken'){
-      /* 飞镖走自己的曲线，不进入下面的「直线位移 + 命中即销毁」通用逻辑。
-         通用逻辑有个致命问题：pierce=0 时第一只怪就把它吃掉了，
-         所以「出去再回来」这个卖点从来没真正发生过 —— 玩家只看见一道青绿色的东西
-         撞一下就没了，感受不到来回。现在飞镖只在自己的寿命结束时消失。 */
+      /* 真实的回旋镖：直着甩出去 → 到最远点掉头 → 飞回「玩家此刻的位置」。
+         旧写法用 sin(πu) 做前向位移、sin(2πu) 做侧摆，看起来是画一片叶子，
+         而且终点固定是「扔出去时脚下的那个点」—— 玩家一边跑一边扔，
+         镖就落在他身后原地消失，完全不像「收回手里」。
+         现在回程一项直接朝 hero 的实时坐标插值，人往哪跑镖就往哪追。 */
       b.u += dt / b.dur;
       if(b.u >= 1){
-        burst(b.x, b.y, b.z, SHU_COL, 4, 5, 0.55);
-        arr.splice(i, 1);
-        continue;
+        b.laps = (b.laps || 1) - 1;
+        if(b.laps > 0){
+          /* 超旋：回到手上不停，从当前站位再甩一圈 */
+          b.u -= 1;
+          b.done = (b.done || 0) + 1;
+          b.ox = hero.x; b.oz = hero.z;
+        } else {
+          shock(hero.x, hero.z, SHU_COL, 1.5, 0.2);
+          burst(hero.x, 1.2, hero.z, SHU_COL, 3, 4, 0.4);
+          arr.splice(i, 1);
+          continue;
+        }
       }
       var su = b.u;
-      var sDist = Math.sin(Math.PI * su);          // 前向：0 → 最远 → 0
-      var lat = Math.sin(TAU * su) * b.amp;        // 侧向：去程偏一边、回程偏另一边
-      b.x = b.ox + b.dirx * b.maxD * sDist + b.sidex * lat;
-      b.z = b.oz + b.dirz * b.maxD * sDist + b.sidez * lat;
-      /* 切线方向用解析导数算，飞镖朝向永远贴着轨迹走 */
-      var dxu = b.dirx * b.maxD * Math.PI * Math.cos(Math.PI*su)
-              + b.sidex * b.amp * TAU * Math.cos(TAU*su);
-      var dzu = b.dirz * b.maxD * Math.PI * Math.cos(Math.PI*su)
-              + b.sidez * b.amp * TAU * Math.cos(TAU*su);
-      if(Math.hypot(dxu, dzu) > 0.01) b.ang = Math.atan2(dxu, dzu);
+      var outPhase = su < 0.5;
+      /* 去程 k: 0→1；回程 k 必须也是 0→1（从最远点回到手上），
+         写成 (1-su)*2 会让它在回程起点瞬移到玩家身上再飞出去。 */
+      var k = outPhase ? su * 2 : (su - 0.5) * 2;
+      var fx = b.ox + b.dirx * b.maxD;                    // 最远点
+      var fz = b.oz + b.dirz * b.maxD;
+      var lat = Math.sin(Math.PI * k) * b.amp * (outPhase ? 1 : -1);
+      var px, pz;
+      if(outPhase){
+        px = b.ox + b.dirx * b.maxD * k + b.sidex * lat;
+        pz = b.oz + b.dirz * b.maxD * k + b.sidez * lat;
+      } else {
+        px = fx + (hero.x - fx) * k + b.sidex * lat;
+        pz = fz + (hero.z - fz) * k + b.sidez * lat;
+      }
+      var pvx = px - b.x, pvz = pz - b.z;
+      b.x = px; b.z = pz;
+      if(Math.hypot(pvx, pvz) > 0.0005) b.ang = Math.atan2(pvx, pvz);
       b.spinA += dt * 24;
-      b.tx = b.x - dxu * 0.05; b.tz = b.z - dzu * 0.05;   // 拖尾落点
+      b.tx = px - pvx * 1.6; b.tz = pz - pvz * 1.6;       // 拖尾落点
 
       var lim2 = ARENA_R - 1, dd2 = Math.hypot(b.x, b.z);
       if(dd2 > lim2){ b.x = b.x/dd2*lim2; b.z = b.z/dd2*lim2; }
 
-      /* 每一「段」单独记账：去程、回程（超旋时四段）各能打同一个敌人一次。
-         这样出去的路上有伤害、回来的路上也有伤害，而不是走个过场。 */
-      var seg = Math.min(b.segsN-1, Math.floor(su * b.segsN));
+      /* 每一「段」单独记账：每一圈的去程、回程各能打同一个敌人一次。 */
+      var seg = (b.done || 0) * 2 + (outPhase ? 0 : 1);
       var hm = b.segs[seg] || (b.segs[seg] = []);
-      var legDmg = b.dmg * (seg % 2 === 1 ? b.backMul : 1);
+      var legDmg = b.dmg * (outPhase ? 1 : b.backMul);
       for(var k2=0;k2<4;k2++){
         var list2 = E[EKEYS[k2]];
         for(var j2=0;j2<list2.length;j2++){
@@ -5371,17 +5474,12 @@ function initHeroLoadout(){
   ultQueue.length = 0;
   skyArrows.length = 0;
   ultBeam.visible = false; ultBeamCore.visible = false; ultRingFx.visible = false;
-  if(chosenHero === 'swift'){
-    /* 疾风＝射击线：弓 + 射击精通 1 级 */
-    hero.speed = 10.4;
-    hero.weapons = [{id:'bow', lv:1, cd:0, tick:0}];
-    hero.passives = {move:1, shot:1};
-  } else {
-    /* 铁壁＝贴身线：环绕镰 + 贴身精通 1 级 */
-    hero.speed = 9.0;
-    hero.weapons = [{id:'scythe', lv:1, cd:0, tick:0}];
-    hero.passives = {hp:1, melee:1};
-  }
+  /* 起手武器与被动全部由职业决定，这里不再写死「弓开局」。 */
+  var cls = heroClass(chosenHero);
+  hero.speed = cls.speed;
+  hero.weapons = [{id:cls.weapon, lv:1, cd:0, tick:0}];
+  hero.passives = {};
+  for(var k in cls.passives) hero.passives[k] = cls.passives[k];
 }
 
 /* 清空世界里的全部实体。
@@ -5542,10 +5640,28 @@ function togglePause(){
 }
 
 /* ═══════════ 界面绑定 ═══════════ */
+/* ═══════════ 六个职业 ═══════════
+   每个职业绑一把起手武器 + 一件起手被动，理论上对应一个超武。
+   v0.17 之前只有两个角色、而且都从弓（或镰刀）开始，玩家没有选择权 ——
+   现在开局先选职业，武器由职业决定，buildHero 按 id 拼不同的模型。 */
 var HEROES = [
-  {id:'swift', name:'疾风', sub:'移速 +13%，开局自带疾风之靴', tag:'DPS 走位流'},
-  {id:'tank',  name:'铁壁', sub:'生命上限 +28，开局自带铁壁之心', tag:'肉盾贴脸流'}
+  {id:'swift',    name:'疾风', sub:'移速 +13% · 开局疾风之靴', tag:'远程散射', weapon:'bow',
+   passives:{move:1, shot:1}, speed:10.4, body:0xd81b60, accent:0xffc400, glow:0x00e5ff},
+  {id:'ward',     name:'铁壁', sub:'生命 +18 · 开局铁壁之心',   tag:'近身环绕', weapon:'scythe',
+   passives:{hp:1, melee:1},  speed:9.0,  body:0x1f6f4a, accent:0xb6ff3c, glow:0xb6ff3c},
+  {id:'ricochet', name:'回锋', sub:'移速 +6% · 开局投掷精通',   tag:'投掷往返', weapon:'shuriken',
+   passives:{move:1, throw:1}, speed:10.0, body:0xc2521a, accent:0xff8a1f, glow:0xff8a1f},
+  {id:'trapper',  name:'布阵', sub:'生命 +18 · 开局贴身精通',   tag:'地面布设', weapon:'spike',
+   passives:{hp:1, melee:1},  speed:9.4,  body:0x532a86, accent:0x9b7bea, glow:0x7b2ff7},
+  {id:'beamer',   name:'贯光', sub:'攻速 +5% · 开局射击精通',   tag:'直线贯穿', weapon:'laser',
+   passives:{shot:1, hp:1},   speed:8.8,  body:0x24506e, accent:0x4a7fb8, glow:0x4a7fb8},
+  {id:'bomber',   name:'火药', sub:'暴击 +4% · 开局投掷精通',   tag:'范围清场', weapon:'bomb',
+   passives:{throw:1, move:1}, speed:9.6, body:0xa01c22, accent:0xff3b30, glow:0xff3b30}
 ];
+function heroClass(id){
+  for(var i=0;i<HEROES.length;i++) if(HEROES[i].id === id) return HEROES[i];
+  return HEROES[0];
+}
 var RATES = [
   {v:0.65, n:'悠闲'},
   {v:1.00, n:'标准'},
@@ -5563,21 +5679,38 @@ function inkOn(hex){
   return L > 0.5 ? '#0a0a12' : '#fff6e9';
 }
 
+function hexcol(n){ return '#' + ('000000' + n.toString(16)).slice(-6); }
+
 function renderPickers(){
   var hb = $('heroes');
   hb.innerHTML = '';
-  HEROES.forEach(function(h, idx){
+  HEROES.forEach(function(h){
     var d = document.createElement('div');
     d.className = 'pick' + (h.id === chosenHero ? ' on' : '');
-    var pcol = idx === 0 ? '#00e5ff' : '#ff5b52';
-    d.style.setProperty('--pcol', pcol);   // 卡片左侧那道色条跟着这个走
+    var pcol = hexcol(h.glow);
+    d.style.setProperty('--pcol', pcol);   // 卡片左侧那道色条跟着武器色走
     d.innerHTML =
       '<div class="pico" style="background:' + pcol + '">' + h.name.charAt(0) + '</div>' +
-      '<div class="ptxt"><b>' + h.name + '</b><s>' + h.sub + '</s>' +
-      '<div class="tagline">' + h.tag + '</div></div>';
-    d.onclick = function(){ chosenHero = h.id; renderPickers(); };
+      '<b>' + h.name + '</b><s>' + h.tag + '</s>';
+    d.onclick = function(){
+      if(chosenHero === h.id) return;
+      chosenHero = h.id;
+      /* 选职业立刻换背景里站着的那个模型 —— 六个职业的剪影必须一眼能分出来，
+         光靠文字选是感受不到的。 */
+      rebuildHeroModel(h.id);
+      renderPickers();
+    };
     hb.appendChild(d);
   });
+  var desc = $('herodesc');
+  if(desc){
+    var c = heroClass(chosenHero);
+    /* 把「起手武器 → 本职业超武」写在同一行：选职业时就知道这条路最后长什么样 */
+    var ev = EVO[c.weapon];
+    desc.innerHTML = '<b>' + c.name + '</b><i>' + WDEF[c.weapon].name + '起手</i>' +
+                     '<span>' + c.sub + '　·　' + c.tag +
+                     (ev ? '　·　进化：' + ev.name : '') + '</span>';
+  }
   [['rates', true], ['rates2', false]].forEach(function(pair){
     var box = $(pair[0]);
     if(!box) return;
@@ -6011,7 +6144,7 @@ if(window.screen && screen.orientation && screen.orientation.addEventListener){
 }
 
 /* ═══════════ 启动 ═══════════ */
-hero.obj = buildHero();
+hero.obj = buildHero(chosenHero);
 refreshStats();
 renderPickers();
 updateHUD();
@@ -6087,10 +6220,64 @@ requestAnimationFrame(function(t){
   lastT = t;
   requestAnimationFrame(loop);
 });
-setTimeout(function(){
-  boot.classList.add('out');
-  setTimeout(function(){ boot.style.display = 'none'; }, 460);
-}, 260);
+/* ─────────── 进入加载页 ───────────
+   之前是「等 260 毫秒自动消失」，代价全推到玩家身上：点「开始对战」那一刻要
+   现建 AudioContext、现编着色器、现铺首批敌人，主线程卡住，音乐就晚几秒才响。
+   现在把这三件事搬到加载页里做，而且必须在**用户手势**里做 ——
+   浏览器的自动播放策略要求点击之后才能出声。 */
+var bootEl = $('boot'), bootTxt = $('boottxt'), bootBar = $('bootbar'), bootGo = $('bootgo');
+var bootDone = false;
+
+function bootStep(txt, pct){
+  if(bootTxt) bootTxt.textContent = txt;
+  if(bootBar) bootBar.style.width = pct + '%';
+}
+
+function bootRun(){
+  if(bootDone) return;
+  bootDone = true;
+  bootEl.classList.add('go');
+
+  var steps = [
+    ['起 播 音 乐', 24, function(){
+      unlockAudio();                 /* 在手势里建 AC */
+      BGM.setMode('menu');
+      BGM.resume();
+    }],
+    ['编 译 着 色 器', 58, function(){
+      /* 真编译一遍：这一步做完，进对局时不会再因为新建材质而卡帧 */
+      try{ renderer.compile(scene, camera); }catch(e){}
+    }],
+    ['铺 开 战 场', 86, function(){
+      updateCamera(0.016, 0, 0);
+      renderEnemies(); renderBullets(); renderGems();
+    }]
+  ];
+
+  var i = 0;
+  (function next(){
+    if(i >= steps.length){
+      bootStep('就 绪', 100);
+      setTimeout(function(){
+        bootEl.classList.add('out');
+        setTimeout(function(){ bootEl.style.display = 'none'; }, 460);
+        SFX.whooshUp();
+      }, 200);
+      return;
+    }
+    var st = steps[i++];
+    bootStep(st[0], st[1]);
+    /* 40ms 让浏览器把进度条画出来，再干活 —— 否则三步在同一帧里跑完，
+       进度条一次都刷不到，看起来像没加载。 */
+    setTimeout(function(){ st[2](); next(); }, 40);
+  })();
+}
+if(bootGo) bootGo.onclick = bootRun;
+if(bootEl) bootEl.onclick = function(){ bootRun(); };
+window.__POW_BOOT = bootRun;
+/* 8 秒没人点就自己进（自动化截图 / 键盘党兜底）。此时可能没有声音，
+   第一次点击游戏内任意位置会补上。 */
+setTimeout(function(){ if(!bootDone) bootRun(); }, 8000);
 
 /* ─────────── 尺寸 ─────────── */
 function onResize(){
