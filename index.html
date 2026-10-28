@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#9ed4f5">
-<meta name="app-version" content="v0.18">
-<meta name="app-built" content="2026-10-28">
+<meta name="app-version" content="v0.19">
+<meta name="app-built" content="2026-10-29">
 <title>爆裂弓箭手</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230a0a12'/%3E%3Ccircle cx='16' cy='16' r='9' fill='%23ff2e88'/%3E%3Ccircle cx='16' cy='16' r='3.5' fill='%23ffe600'/%3E%3C/svg%3E">
 <script src="https://unpkg.com/three@0.150.1/build/three.min.js"></script>
@@ -2352,9 +2352,19 @@ function rebuildHeroModel(cid){
    第 1 波到第 10 波涨约 200 倍，所以敌人血量必须指数追赶。
    原来用线性 ×3，第 4 波就被玩家彻底甩开，之后全是纸。
    R=1.75 是按「小怪 TTK 稳定在 0.2-0.6 秒」反推的，改这个值要重跑数值表。 */
-var WAVE_HP_R = 1.75;        // 每波血量成长率
+/* 每波血量成长率。1.75 用了很久，问题是它和玩家伤害的成长速度脱钩：
+   第 1 波到第 10 波血量涨 154 倍，同一段里玩家单发伤害只涨 6.9 倍。
+   于是第 5 波前「一发一只」，第 7 波后突然变成「26 发一只」——
+   中间没有过渡，两头都不好玩：前面伤害没用，后面伤害也不够。
+   1.40 让第 10 波是 20.7 倍，和伤害成长大致平行，杂兵全程 1-3 发。
+   压力改由密度（WAVE_RATE_STEP）和高血量单位（肥球 / 精英）承担。 */
+var WAVE_HP_R = 1.40;        // 每波血量成长率
 var WAVE_DMG_STEP = 0.10;    // 每波伤害 +10%（等差，伤害涨太快会直接要命）
-var WAVE_RATE_STEP = 0.09;   // 每波刷怪率 +9%
+/* 每波刷怪率。原来 +9%/波，第 10 波是 1.81 倍；
+   但实测清怪速率在第 5 波之后就饱和在 4-5 只/秒（受「怪走过来的速度」和
+   「一次攻击能碰到几只」限制，不是受伤害限制），刷怪却还在往上冲，
+   于是第 8 波之后场上堆到八九十只，玩家只能逃。现在压到 +5%。 */
+var WAVE_RATE_STEP = 0.05;   // 每波刷怪率 +5%
 
 function waveCurve(wave, prog){
   var w = clamp(wave, 1, 10);
@@ -3054,7 +3064,7 @@ var WDEF = {
        一个呼吸周期两段伤害。hitMul 2 就是给表算这两段的。 */
     cd:[1.10,1.02,0.94,0.86,0.78], dmg:[10,13,16,20,24],
     cnt:[1,1,1,1,1], coef:2.4, cntEvo:1, coefEvo:3.6, sHit:0.70, sHitEvo:0.70, hitMul:2,
-    lv:['单刃','双刃','三刃','四刃','六刃'],
+    lv:['双刃','三刃','四刃','五刃','六刃'],
     desc:'刀刃绕身呼吸：向外张开一段、收回一段，两段都伤人。贴脸才有收益。'
   },
   bomb:{
@@ -3084,12 +3094,15 @@ var ARCH = {
 var ARCH_KEYS = ['melee', 'ranged'];
 var SET_BONUS = 1.30;      // 同流派双持
 var ARCH_DMG = 0.20;       // 每级流派精通加的伤害
+var HASTE_STEP = 0.08;     // 每级「急速」加的攻速（满级 ×1.40）
 
 var PDEF = {
   melee: {name:'近身精通', short:'近身', col:'#b6ff3c', max:5, arch:'melee',
           txt:function(l){ return '连刃 伤害 +'+Math.round(l*100*ARCH_DMG)+'%，范围 +'+Math.round(l*6)+'%'; }},
   ranged:{name:'远程精通', short:'远程', col:'#00e5ff', max:5, arch:'ranged',
-          txt:function(l){ return '弓/激光/炸弹 伤害 +'+Math.round(l*100*ARCH_DMG)+'%，攻速 +'+Math.round(l*5)+'%'; }},
+          txt:function(l){ return '弓/激光/炸弹 伤害 +'+Math.round(l*100*ARCH_DMG)+'%'; }},
+  haste: {name:'急速',     short:'攻速', col:'#ffe600', max:5,
+          txt:function(l){ return '全武器攻速 +'+Math.round(l*HASTE_STEP*100)+'%'; }},
   move:  {name:'疾风之靴', short:'移速', col:'#ffc233', max:5,
           txt:function(l){ return '移动速度 +'+Math.round(l*6)+'%'; }},
   hp:    {name:'铁壁之心', short:'生命', col:'#ff3b30', max:5,
@@ -3097,7 +3110,7 @@ var PDEF = {
   magnet:{name:'磁力场',   short:'拾取', col:'#b07bff', max:5,
           txt:function(l){ return '经验拾取范围 +'+Math.round(l*30)+'%'; }}
 };
-var PKEYS = ['melee', 'ranged', 'move', 'hp', 'magnet'];
+var PKEYS = ['melee', 'ranged', 'haste', 'move', 'hp', 'magnet'];
 
 /* ═══════════ 超武进化 ═══════════
    武器满级 + 指定被动 ≥3 级 → 进化。用来解决「满级之后无事可做」。 */
@@ -3492,8 +3505,12 @@ function refreshStats(){
     hero.stat.arch[a] = mul;
     hero.stat.archN[a] = cnt;
   });
-  hero.stat.as    = 1 + (p.shot||0)*0.05;
-  hero.stat.crit  = 0.06 + (p.throw||0)*0.04;
+  /* 攻速是唯一的「多打一轮」通道，也是后期清怪速率的全部来源。
+     v0.18 把流派从三条收到两条时，这里读的还是已经不存在的 p.shot ——
+     「远程精通 攻速 +5%/级」写在卡面上，实际恒等于 1.0，一次都没生效过。 */
+  hero.stat.as    = 1 + (p.haste||0)*HASTE_STEP;
+  /* 暴击目前没有成长通道，固定 6%。原来读 p.throw，同样是不存在的键。 */
+  hero.stat.crit  = 0.06;
   hero.stat.range = 1 + (p.melee||0)*0.06;
   hero.stat.spd   = hero.speed * (1 + (p.move||0)*0.06);
   hero.stat.pick  = 4.6 * (1 + (p.magnet||0)*0.30);
@@ -4180,19 +4197,43 @@ function renderBag(){
   $('bagcount').textContent = '武器 ' + hero.weapons.length + ' 把　被动 ' + Object.keys(hero.passives).length + ' 项';
 }
 
-/* ═══════════ 镰刀视觉 ═══════════ */
-var bladeParts = [];
+/* ═══════════ 连刃视觉 ═══════════
+   一把刀由五件拼成：刀身（平直段）+ 刀尖（四棱收锋）+ 护手 + 握柄 + 柄头。
+   之前整把刀就是一个 Box —— 俯视看是一截绿板子，转起来像在旁边抽动。
+
+   两个关键点：
+   1. 刀身与刀尖分开给色，刀尖更亮。收锋那一段在俯视里能看出「锋」，不是一根棍。
+   2. 刀身沿**切线**摆（不是沿半径朝外戳）。沿半径朝外是「太阳光芒」，沿切线才是「转起来的刀」。
+   另加两道同心细环标出内圈 / 外圈，让「呼吸」的边界看得见 —— 也顺带说明了判定范围。 */
+var bladeParts = [], bladeRings = [];
 (function(){
-  /* 刀身用细长盒而不是圆环：俯视角下圆环是「侧着看的一条线」，
-     会被描边整条吞掉，看起来像六根黑钉子。盒子在俯视里始终是刀刃的形状。 */
-  var geo = new THREE.BoxGeometry(0.17, 0.09, 1.02);
+  var geo = mergeParts([
+    {geo:G_box(0.15, 0.052, 0.60), color:0xb6ff3c, z:0.00},      // 刀身
+    {geo:G_cone(0.086, 0.36, 4), color:0xe6ffa2, z:0.47, rx:Math.PI/2, sz:0.34}, // 刀尖（压扁成刃）
+    {geo:G_box(0.30, 0.052, 0.062), color:0x1d3610, z:-0.33},   // 护手
+    {geo:G_cyl(0.044, 0.040, 0.24, 6), color:INK, z:-0.47, rx:Math.PI/2},        // 握柄
+    {geo:G_sphere(0.056, 6, 6), color:0x1d3610, z:-0.61}        // 柄头
+  ]);
+  var edge = outlineGeo(geo, 0.018);
   for(var i=0;i<6;i++){
-    var m = new THREE.Mesh(geo, toon(COS.lime));
-    withOutline(m, 1.18);
+    var m = new THREE.Mesh(geo, toonVC());
+    m.add(new THREE.Mesh(edge, OUTLINE_MAT));
     m.visible = false;
     m.frustumCulled = false;
     scene.add(m);
     bladeParts.push(m);
+  }
+  /* 呼吸边界：两个细环，用同一个单位几何缩放，避免每帧重建几何 */
+  var ringGeo = new THREE.RingGeometry(0.975, 1.0, 44);
+  for(var r=0;r<2;r++){
+    var rm = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({
+      color:0xb6ff3c, transparent:true, opacity:0, side:THREE.DoubleSide, depthWrite:false
+    }));
+    rm.rotation.x = -Math.PI/2;
+    rm.position.y = 0.06;
+    rm.visible = false;
+    scene.add(rm);
+    bladeRings.push(rm);
   }
 })();
 
@@ -4348,7 +4389,9 @@ function updateSpawn(dt){
      这是「单挑」成立的前提：玩家只需要读 BOSS 的招式，不用同时躲杂兵。 */
   if(boss && !boss.dead) return;
   var wc = waveCurve(S.wave, S.waveLen ? S.waveT/S.waveLen : 0);
-  var rate = (1.35 + S.wave*0.5) * wc.rate * S.spawnMul;
+  /* 基础密度也跟着降：原来 1.35 + 0.5×波次，第 10 波光基础值就到 6.35/秒，
+     叠加倍率后 11.5/秒，而满配玩家的实测清怪上限只有 5.3/秒。 */
+  var rate = (1.30 + S.wave*0.42) * wc.rate * S.spawnMul;
   var cap = Math.min(MAX_ENEMY, 24 + S.wave*13) * (S.spawnMul > 1.4 ? 1.25 : 1);
   spawnAcc += dt * rate;
   var alive = aliveCount();
@@ -4545,23 +4588,41 @@ function updateHero(dt){
      bdir=+1 正在向外张（内→外），bdir=-1 正在收回（外→内）。
      结算点就落在两端的极值上 —— 视觉上刀刃到哪个圈，伤害就打到哪个圈。 */
   var sc = hasWeapon('blade');
-  var cnt = sc ? (sc.evo ? 6 : [1,2,3,4,6][sc.lv-1]) : 0;
-  var R = 0;
+  var cnt = sc ? (sc.evo ? 6 : [2,3,4,5,6][sc.lv-1]) : 0;
+  var R = 0, ext = 0, bank = 0;
   if(sc){
     var rg = bladeRange(sc, hero.stat);
     var half = WDEF.blade.cd[sc.lv-1] / hero.stat.as / 2;
     var prog = Math.min(1, (sc.bt || 0) / (half || 1));
-    R = (sc.bdir === -1) ? (rg.max + (rg.min - rg.max) * prog)
-                         : (rg.min + (rg.max - rg.min) * prog);
+    /* ext = 「已经张开到几分」，0 在内圈、1 在外圈。两个方向共用同一个量，
+       环的亮度、刀身的倾斜都从它推，避免各写一套导致不同步。 */
+    ext = (sc.bdir === 1) ? prog : 1 - prog;
+    R = rg.min + (rg.max - rg.min) * ext;
+    /* 倾斜在两端归零、中间最大 —— 极值处方（刀正打在怪身上）保持平直，
+       中段才微微立起来，读起来像在划而不是在抖。 */
+    bank = Math.sin(ext * Math.PI) * 0.34;
+    bladeRings[0].visible = bladeRings[1].visible = true;
+    bladeRings[0].scale.setScalar(rg.min);
+    bladeRings[1].scale.setScalar(rg.max);
+    bladeRings[0].position.set(hero.x, 0.06, hero.z);
+    bladeRings[1].position.set(hero.x, 0.06, hero.z);
+    bladeRings[0].material.opacity = 0.05 + 0.16 * (1 - ext);
+    bladeRings[1].material.opacity = 0.05 + 0.16 * ext;
+  } else {
+    bladeRings[0].visible = bladeRings[1].visible = false;
   }
   for(var i=0;i<6;i++){
     var m = bladeParts[i];
     if(i < cnt){
       m.visible = true;
-      var a = S.t * (3.2 + (sc?sc.lv*0.35:0)) + i/cnt*TAU;
-      m.position.set(hero.x + Math.cos(a)*R, 0.9, hero.z + Math.sin(a)*R);
-      /* 刀身沿切线方向放，看起来像在转，不是六块板子朝外戳 */
-      m.rotation.set(Math.sin(S.t*5 + i)*0.12, -a + Math.PI/2, Math.sin(S.t*5 + i)*0.18);
+      var a = S.t * (3.0 + (sc?sc.lv*0.42:0)) + i/cnt*TAU;
+      /* 刀身沿切线摆，才是「转」；沿半径摆是「朝外戳」，六个方向看着像太阳。
+         高度随 ext 微抬：张开的刀高一点，收回时压低，俯视能看出前后层次。 */
+      m.position.set(hero.x + Math.cos(a)*R, 0.80 + 0.10*ext, hero.z + Math.sin(a)*R);
+      m.rotation.set(bank, -a, 0);
+      /* 张开时刀略微放大：远景机位（相机高 24）下刀身只有二十几像素，
+         再加一点体量才能认出是刃。三个百分点跟随呼吸，不是恒定放大。 */
+      m.scale.setScalar(1.12 + 0.06*ext);
     } else {
       m.visible = false;
     }
@@ -5928,6 +5989,7 @@ function loop(now){
     hero.obj.rotation.y = titleT*0.5;
     hero.obj.position.y = Math.sin(titleT*2)*0.05;
     bladeParts.forEach(function(m){ m.visible = false; });
+    bladeRings.forEach(function(m){ m.visible = false; });
   } else {
     if(S.mode === 'play'){
       S.t += dt;
